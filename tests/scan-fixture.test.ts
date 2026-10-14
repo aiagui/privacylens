@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scanFixture } from "../src/scanner/scan-fixture";
+import { SIGNATURE_SET_VERSION, signatures } from "../src/scanner/signatures";
 
 let origin: string;
 let redirectedOrigin: string;
@@ -114,6 +115,12 @@ describe("browser fixture scan", () => {
     expect(
       report.technologies.filter((tech) => tech.observation === "observed"),
     ).toEqual([]);
+    expect(
+      report.thirdPartyRequests.every(
+        (request) => request.classification === "unknown",
+      ),
+    ).toBe(true);
+    expect(report.signatureSetVersion).toBeTruthy();
   }, 20_000);
 
   it("still raises the concern for a genuine collection request", async () => {
@@ -151,6 +158,18 @@ describe("browser fixture scan", () => {
         (request) => request.domain === "www.google-analytics.com",
       ),
     ).toBe(true);
+    // Every detection must be reproducible: a registered signature at the
+    // report's version, and a non-empty documented reason.
+    expect(report.signatureSetVersion).toBe(SIGNATURE_SET_VERSION);
+    for (const technology of report.technologies) {
+      expect(signatures.some((s) => s.id === technology.signature?.id)).toBe(
+        true,
+      );
+      expect(technology.signature?.version).toBe(SIGNATURE_SET_VERSION);
+      expect(technology.evidence.length).toBeGreaterThan(0);
+      for (const line of technology.evidence)
+        expect(line.length).toBeGreaterThan(20);
+    }
     expect(JSON.stringify(report)).not.toContain("private-token");
     expect(JSON.stringify(report)).not.toContain("essential=yes");
   }, 20_000);

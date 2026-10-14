@@ -54,8 +54,14 @@ describe("dev-only fixture scan route", () => {
     );
     for (const technology of report.technologies) {
       expect(Object.keys(technology).sort()).toEqual(
-        ["category", "evidence", "name", "observation"].sort(),
+        ["category", "evidence", "name", "observation", "signature"].sort(),
       );
+      // Only an id and the signature-set version may identify the rule; match
+      // config (domains, path patterns) must never reach a report.
+      expect(Object.keys(technology.signature ?? {}).sort()).toEqual([
+        "id",
+        "version",
+      ]);
     }
   }, 20_000);
 

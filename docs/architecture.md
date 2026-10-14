@@ -17,7 +17,9 @@ current scope needs one application rather than a monorepo or microservices.
    heuristic and incomplete.
 4. `src/scanner/scan-fixture.ts` collects browser initiation evidence from a
    caller-owned loopback HTTP fixture. External requests and redirects are blocked.
-5. `src/scanner/dev-fixtures.ts` owns fixed HTML, starts its own loopback server and
+5. `src/scanner/signatures.ts` holds versioned tracker signatures; see
+   [signatures](signatures.md) for classifications and contribution rules.
+6. `src/scanner/dev-fixtures.ts` owns fixed HTML, starts its own loopback server and
    selects fixtures by exact own-property IDs. No request controls the destination.
 
 The sample report imports only types from the collector and never starts a

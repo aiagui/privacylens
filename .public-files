@@ -17,6 +17,7 @@ docs/architecture.md
 docs/ci-and-releases.md
 docs/development.md
 docs/security.md
+docs/signatures.md
 eslint.config.mjs
 next-env.d.ts
 next.config.ts
@@ -37,6 +38,7 @@ src/sample-report.ts
 src/scanner/detectors.ts
 src/scanner/dev-fixtures.ts
 src/scanner/scan-fixture.ts
+src/scanner/signatures.ts
 src/scanner/types.ts
 src/scanner/url-policy.ts
 tests/detectors.test.ts
@@ -46,6 +48,7 @@ tests/proxy.test.ts
 tests/publication-policy.test.ts
 tests/sample-report.test.ts
 tests/scan-fixture.test.ts
+tests/signatures.test.ts
 tests/url-policy.test.ts
 tsconfig.json
 vitest.config.mts
