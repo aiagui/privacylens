@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { sandboxAvailable } from "./helpers/sandbox";
+import { resolveSandbox } from "./helpers/sandbox";
 import { EXIT, plain, runCli } from "../src/cli/privacylens";
 import { ScanLimitError } from "../src/scanner/scan-live";
 import { SAMPLE_REPORT } from "../src/sample-report";
@@ -184,7 +184,7 @@ describe("cli failures", () => {
 describe("cli process", () => {
   let sandbox = true;
   beforeAll(async () => {
-    sandbox = await sandboxAvailable();
+    sandbox = await resolveSandbox("tests/cli.test.ts");
   }, 30_000);
   // Only where the host cannot start the sandbox does the test say so explicitly.
   const run = (...args: string[]) =>

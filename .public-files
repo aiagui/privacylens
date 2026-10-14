@@ -74,6 +74,7 @@ tests/ip-policy.test.ts
 tests/proxy.test.ts
 tests/publication-policy.test.ts
 tests/sample-report.test.ts
+tests/sandbox.test.ts
 tests/scan-fixture.test.ts
 tests/scan-live.test.ts
 tests/signatures.test.ts

@@ -11,8 +11,8 @@ import {
   redactUrls,
 } from "../src/scanner/scan-live";
 import { UnsafeTargetError } from "../src/scanner/url-policy";
-import { browserTree, listProcesses } from "../src/scanner/browser-process";
-import { sandboxAvailable } from "./helpers/sandbox";
+import { listProcesses } from "../src/scanner/browser-process";
+import { resolveSandbox } from "./helpers/sandbox";
 import type { EgressOptions } from "../src/scanner/egress-proxy";
 
 /**
@@ -65,11 +65,7 @@ beforeAll(async () => {
   await new Promise<void>((done) => probe.listen(0, "127.0.0.1", done));
   closedPort = (probe.address() as { port: number }).port;
   await new Promise((done) => probe.close(done));
-  sandboxOK = await sandboxAvailable();
-  if (!sandboxOK)
-    console.warn(
-      "Chromium sandbox cannot start here; scanner tests run without it",
-    );
+  sandboxOK = await resolveSandbox("tests/scan-live.test.ts");
   internalServer = createServer((_req, res) => {
     internalRequests += 1;
     res.end("internal-secret");
@@ -567,54 +563,6 @@ describe("WebRTC stays closed", () => {
       settleMs: 2500,
     });
     expect(datagrams).toBe(0);
-  }, 40_000);
-});
-
-describe("browser sandbox", () => {
-  it("is enabled by default and recorded in the report", async () => {
-    // No explicit chromiumSandbox: this exercises the default itself.
-    const report = await scanLive(`http://site.example:${publicPort}/`, {
-      ...options(),
-      chromiumSandbox: undefined,
-    });
-    expect(report.provenance?.browser.sandbox).toBe(sandboxOK);
-    if (sandboxOK) {
-      expect(report.limitations.join(" ")).not.toMatch(/sandbox was disabled/);
-    }
-  }, 30_000);
-
-  it("says so in the report when the sandbox is switched off", async () => {
-    const report = await scanLive(`http://site.example:${publicPort}/`, {
-      ...options(),
-      chromiumSandbox: false,
-    });
-    expect(report.provenance?.browser.sandbox).toBe(false);
-    expect(report.limitations.join(" ")).toMatch(/sandbox was disabled/);
-  }, 30_000);
-
-  it("launches Chromium processes without --no-sandbox when the sandbox is on", async (context) => {
-    if (!sandboxOK) return context.skip();
-    const run = async (sandbox: boolean) => {
-      const marker = `privacylens-run-test-${Math.random().toString(16).slice(2)}`;
-      const browser = await chromium.launch({
-        headless: true,
-        chromiumSandbox: sandbox,
-        args: [`--privacylens-run=${marker}`],
-      });
-      try {
-        await (await browser.newPage()).goto("about:blank");
-        return (await browserTree(marker)).map((proc) => proc.args);
-      } finally {
-        await browser.close();
-      }
-    };
-    expect(
-      (await run(true)).some((args) => args.includes("--no-sandbox")),
-    ).toBe(false);
-    // Control: Playwright does add the flag when the sandbox is off.
-    expect(
-      (await run(false)).some((args) => args.includes("--no-sandbox")),
-    ).toBe(true);
   }, 40_000);
 });
 
