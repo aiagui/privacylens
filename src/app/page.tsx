@@ -34,13 +34,41 @@ export default function Home() {
                   What we inspect <span aria-hidden="true">↓</span>
                 </a>
               </div>
-              <p className="availability-note" role="note">
-                <span className="status-dot" aria-hidden="true" />
-                <span>
-                  <strong>Product preview.</strong> Public URL scanning is not
-                  available yet. Explore the sample report today.
-                </span>
-              </p>
+              <section className="url-preview" aria-labelledby="url-heading">
+                <div className="url-preview-heading">
+                  <label id="url-heading" htmlFor="website-url">
+                    Inspect a website
+                  </label>
+                  <span>In development</span>
+                </div>
+                <div className="url-input-row">
+                  <span aria-hidden="true">◎</span>
+                  <input
+                    id="website-url"
+                    name="website-url"
+                    type="url"
+                    placeholder="https://example.com"
+                    autoComplete="off"
+                    aria-describedby="scan-availability"
+                    disabled
+                  />
+                  <button
+                    type="button"
+                    aria-describedby="scan-availability"
+                    disabled
+                  >
+                    Scan website <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+                <p
+                  className="availability-note"
+                  id="scan-availability"
+                  role="note"
+                >
+                  Public URL scanning is not available yet. Explore the sample
+                  report today.
+                </p>
+              </section>
             </div>
             <div className="hero-evidence">
               <OpticalField />

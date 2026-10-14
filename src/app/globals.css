@@ -199,20 +199,79 @@ h1 em {
   font-size: 12px;
   text-decoration: none;
 }
-.availability-note {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+.url-preview {
+  margin-top: 30px;
   padding-top: 22px;
-  margin: 32px 0 0;
   border-top: 1px solid #30343e;
-  color: #b5bac7;
-  font-size: 12px;
-  max-width: 530px;
+  max-width: 550px;
 }
-.availability-note strong {
+.url-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.url-preview-heading label {
   font-weight: 650;
-  color: #e4e6ed;
+}
+.url-preview-heading > span {
+  color: #b5bac7;
+  font-size: 10px;
+}
+.url-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #485063;
+  border-radius: 7px;
+  padding: 7px 7px 7px 14px;
+  background: #1d2028;
+}
+.url-input-row > span {
+  color: #b5bac7;
+  font-size: 20px;
+}
+.url-input-row input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: #c8cfe0;
+  font:
+    12px ui-monospace,
+    monospace;
+  padding: 8px 0;
+  opacity: 1;
+}
+.url-input-row input::placeholder {
+  color: #aeb8ce;
+  opacity: 1;
+}
+.url-input-row button {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #4d566a;
+  border-radius: 4px;
+  background: #303747;
+  color: #c6cede;
+  font-size: 11px;
+}
+.url-input-row button span {
+  margin-left: 10px;
+}
+.url-input-row input:disabled,
+.url-input-row button:disabled {
+  cursor: not-allowed;
+}
+.availability-note {
+  margin: 10px 0 0;
+  color: #b5bac7;
+  font-size: 11px;
+  line-height: 1.7;
 }
 .status-dot {
   display: inline-block;
@@ -893,9 +952,19 @@ tbody tr:last-child > * {
     gap: 8px;
   }
   .availability-note {
-    margin-top: 26px;
+    margin-top: 10px;
     font-size: 11px;
   }
+  .url-input-row {
+    flex-wrap: wrap;
+  }
+  .url-input-row input {
+    width: calc(100% - 40px);
+  }
+  .url-input-row button {
+    width: 100%;
+  }
+
   .optical-field svg {
     height: 210px;
   }

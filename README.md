@@ -16,7 +16,7 @@ get a clear, useful answer. The website we're building turns browser observation
 into something people can explore, understand and question.
 
 > **Product preview:** explore the bundled sample report today. Public URL
-> scanning is in development and remains disabled.
+> scanning is in development and remains disabled; its URL field is visibly inactive on the homepage.
 
 ## Who it's for
 

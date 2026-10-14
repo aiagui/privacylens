@@ -92,6 +92,16 @@ try {
   await page.goto(origin);
   await page.getByRole("heading", { level: 1 }).waitFor();
   assert.equal(await page.locator("form").count(), 0);
+  assert.equal(
+    await page
+      .getByRole("textbox", { name: "Inspect a website", exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(
+    await page.getByRole("button", { name: "Scan website" }).isDisabled(),
+    true,
+  );
   assert.match(
     await page.locator("main").innerText(),
     /public URL scanning is not available/i,

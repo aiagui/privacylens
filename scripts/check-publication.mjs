@@ -12,11 +12,11 @@ function git(...args) {
 const reviewedAssets = new Map([
   [
     "docs/assets/home-desktop.png",
-    "92f4fc027f013a42b02d405b095197720b24a8d7fee35236d3119691f66746df",
+    "8b2d77a4f44c1b2585deccb04e12d8338276e2e84594d51b8671c3512d5d1b67",
   ],
   [
     "docs/assets/home-mobile.png",
-    "a64bf66719018cf4ab47840c8f15ef4cf9c859ed96578c046628ec78ac460d51",
+    "ae4740c3d64a94363fe7a068b66dee6cc4b77a1276d2040f2b1f9cd4cb5a7c21",
   ],
   [
     "docs/assets/report-desktop.png",
