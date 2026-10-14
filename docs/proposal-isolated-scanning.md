@@ -37,17 +37,28 @@ the browser, the page or the application code is compromised.
 | C. Short-lived VM per job             | Strong, slow start             | Medium     | Simple to reason about; higher per-scan cost and latency                |
 | D. Run scans only locally (CLI)       | User's own machine and network | Low        | No hosted risk, but inherits the user's network; document the limits    |
 
-Recommendation for a first hosted step: option B or C behind an **invite-only**
-beta, because they can be built from commodity pieces. Option D is a useful
-parallel track that needs no hosting. Provider and region are open decisions.
+No option is selected. Options B and C use commodity pieces and fit a limited
+beta; option D needs no hosting and could proceed in parallel. Provider, region,
+budget, authentication model, retention period and CLI-versus-hosted scanning are
+all open decisions for the maintainer.
 
-## Cost (unverified estimate; re-price before deciding)
+## Cost model (assumptions to validate; no conclusion)
 
-Cost is dominated by browser runtime (roughly 15–30 s of one vCPU and about 1–2 GB
-of memory per scan) plus a small always-on web/queue tier. At a few thousand scans
-per month this is expected to be tens of dollars, rising linearly with volume; the
-real risk is abuse, not baseline cost. No prices have been checked against a
-provider and none should be treated as a quote.
+No cost conclusion is drawn here. Cost per scan is `worker runtime × price per
+vCPU-second and GB-second` plus queue, storage and egress, and it depends on a
+provider that has not been chosen. To decide, measure and fill in:
+
+| Input                          | Status                                        |
+| ------------------------------ | --------------------------------------------- |
+| Median/p95 scan duration       | Unmeasured; measure on real, consenting sites |
+| Peak memory per Chromium job   | Unmeasured                                    |
+| Expected scans per month       | Unknown; depends on access model              |
+| Provider prices and free tiers | Not checked; verify current published pricing |
+| Fixed cost (web, queue, logs)  | Unknown until the architecture is chosen      |
+| Abuse headroom and spend cap   | Open decision                                 |
+
+Abuse is likely to matter more than baseline volume, so a hard spend cap and
+quotas are part of the design regardless of the numbers.
 
 ## Abuse prevention
 

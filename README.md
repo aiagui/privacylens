@@ -57,7 +57,7 @@ in CI; run `gitleaks git --redact` before pushing.
 | `docs`                 | Architecture, threat model and release procedure             |
 | `.github`              | CI, CodeQL, secret detection and manual source releases      |
 
-See the [roadmap](docs/roadmap.md), [isolated-scanning proposal](docs/proposal-isolated-scanning.md), [architecture](docs/architecture.md), [security boundaries](docs/security.md),
+See [architecture](docs/architecture.md), [security boundaries](docs/security.md),
 [development](docs/development.md) and [CI and releases](docs/ci-and-releases.md).
 Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities
 privately using [SECURITY.md](SECURITY.md).
