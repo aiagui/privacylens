@@ -28,6 +28,30 @@ the browser, the page or the application code is compromised.
    size-capped) through a one-way channel. Reports omit values, paths and payloads
    exactly as today.
 
+## Gaps between this design and the current implementation
+
+Verified against `main` when this section was written:
+
+- **No scanning infrastructure exists.** There is no queue, worker image,
+  authentication, quota or egress policy. `POST /api/scan` is a fixed 503.
+- **The collector is fixture-bound.** `scanFixture(target, fixtureOrigin)` aborts
+  every request outside one loopback origin and blocks all redirects. A live scan
+  must let public requests proceed under infrastructure policy, so the collector
+  needs a different request policy. Playwright interception would remain an
+  observation aid and defense in depth, never the boundary.
+- **Evidence language would change.** Today's reports say third-party requests
+  were initiated but blocked before delivery, and classify them as initiation only.
+  A live scan observes delivered requests and responses. Classification wording,
+  limitations text and the `observed` definition in [signatures](signatures.md)
+  must be reviewed so reports claim exactly what was recorded, and no more.
+- **No runtime validation of reports.** `ScanReport` is a TypeScript type only.
+  The "schema-validated" result channel needs a validator, whose approach and any
+  dependency are open decisions.
+- **`validatePublicUrl` is unused.** It would remain input validation, not a
+  security control.
+- **Consent interaction is not implemented.** Reports cover the initial page load
+  only, and the proposal does not add consent clicking.
+
 ## Deployment options (to be decided)
 
 | Option                                | Isolation                        | Ops burden | Notes                                                                   |
@@ -94,6 +118,9 @@ headers or bodies. No third-party analytics. Publish a plain-language privacy no
 
 ## Open decisions for the maintainer
 
+- Whether hosted scanning is the first usable capability, or a local CLI scan
+  ships first (see [roadmap](roadmap.md)); [product direction](product-direction.md)
+  currently names isolated hosted inspection as the first major capability.
 - Hosting provider and budget ceiling.
 - Invite-only vs. account-based access at launch.
 - Retention period and opt-out policy.

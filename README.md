@@ -109,7 +109,8 @@ detector fixtures or shape the next product capabilities. Start with
 [CONTRIBUTING.md](CONTRIBUTING.md), open an
 [issue](https://github.com/aiagui/privacylens/issues), or propose a focused pull request.
 
-Explore the [architecture](docs/architecture.md),
+Explore the [roadmap](docs/roadmap.md), the [isolated-scanning proposal](docs/proposal-isolated-scanning.md),
+[signatures](docs/signatures.md), the [architecture](docs/architecture.md),
 [security boundaries](docs/security.md) and
 [visual identity](docs/visual-identity.md). To report a vulnerability privately,
 follow [SECURITY.md](SECURITY.md).
