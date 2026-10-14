@@ -1,8 +1,8 @@
 /**
  * Characters that must never reach a report, a terminal or the page as plain
  * text: C0 controls and DEL, C1 controls, line and paragraph separators,
- * zero-width space and the byte-order mark, and the text-direction overrides,
- * embeddings and isolates that can reorder or disguise a line.
+ * zero-width space, word joiner and the byte-order mark, and the text-direction
+ * marks, overrides, embeddings and isolates that can reorder or disguise a line.
  *
  * U+200C and U+200D (zero-width non-joiner and joiner) are allowed: Persian and
  * several other scripts, and emoji sequences, need them.
@@ -13,9 +13,12 @@ export function isUnsafeCharacter(code: number): boolean {
     (code >= 0x7f && code <= 0x9f) ||
     code === 0x2028 ||
     code === 0x2029 ||
+    code === 0x061c || // Arabic letter mark (a direction control)
     code === 0x200b ||
     code === 0x200e ||
     code === 0x200f ||
+    (code >= 0x2060 && code <= 0x2064) || // word joiner and invisible operators
+    (code >= 0x206a && code <= 0x206f) || // deprecated format characters
     (code >= 0x202a && code <= 0x202e) ||
     (code >= 0x2066 && code <= 0x2069) ||
     code === 0xfeff

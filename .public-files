@@ -81,6 +81,7 @@ tests/detectors.test.ts
 tests/dev-fixture-registry.test.ts
 tests/dev-scan-fixture-route.test.ts
 tests/egress-proxy.test.ts
+tests/emitted-values.test.ts
 tests/evidence-cap.test.ts
 tests/helpers/sandbox.ts
 tests/ip-policy.test.ts

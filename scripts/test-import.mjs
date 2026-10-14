@@ -620,7 +620,7 @@ try {
     .waitFor();
   const loadMs = Date.now() - loadStart;
   assert.ok(
-    loadMs < 15000,
+    loadMs < 8000,
     `a large report must open promptly (took ${loadMs} ms)`,
   );
   assert.ok(
@@ -635,7 +635,7 @@ try {
     .waitFor();
   const closeMs = Date.now() - closeStart;
   assert.ok(
-    closeMs < 5000,
+    closeMs < 1500,
     `closing a large report must not freeze the page (took ${closeMs} ms)`,
   );
 

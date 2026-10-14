@@ -744,7 +744,6 @@ describe("validateReport: fixes from the import review", () => {
     "a b.example",
     "a/b.example",
     "<img>.example",
-    'a".example',
     "a\\b.example",
     "a@b.example",
     "a?b.example",
@@ -842,4 +841,160 @@ describe("validateReport: fixes from the import review", () => {
         "undefined",
       );
   });
+});
+
+describe("validateReport: every host a browser can use, and the final review's gaps", () => {
+  const request = (change: (r: Draft) => void) =>
+    mutated((d) => change(d.thirdPartyRequests[1] as Draft));
+  const asHost = (host: string) =>
+    request((r) => {
+      r.url = `https://${host}`;
+      r.domain = host;
+    });
+
+  it.each([
+    'a"b',
+    "a`b",
+    "a{b",
+    "a}b",
+    "a|b",
+    "a^b",
+    "a%2ab",
+    "a*b",
+    "a'b",
+    "a(b)",
+    "a;b",
+    "a,b",
+    "a=b",
+    "a+b",
+    "a$b",
+    "a&b",
+    "a!b",
+    "a~b",
+    "a_b",
+  ])(
+    "accepts the host %j that Node's and Chromium's URL parsers allow",
+    (host) => {
+      // Not every one survives URL normalization; the point is the validator takes
+      // whatever the scanner copies from raw.url.hostname.
+      const parsed = (() => {
+        try {
+          return new URL(`https://${host}.example/`).hostname;
+        } catch {
+          return undefined;
+        }
+      })();
+      const value = parsed ?? `${host}.example`;
+      const input = request((r) => {
+        r.url = `https://${value}`;
+        r.domain = value;
+      });
+      const result = validateReport(input);
+      if (parsed === undefined) return;
+      expect(
+        result.ok,
+        `${value}: ${JSON.stringify(!result.ok && result.issues)}`,
+      ).toBe(true);
+    },
+  );
+
+  it("accepts a host and a cookie domain of exactly 300 characters, and rejects 301", () => {
+    expect(
+      validateReport(mutated((d) => (d.cookies[0].domain = "a".repeat(300))))
+        .ok,
+    ).toBe(true);
+    expectRejected(
+      mutated((d) => (d.cookies[0].domain = "a".repeat(301))),
+      /domain/,
+    );
+    const blocked = (host: string) =>
+      mutated((d) => (d.provenance.egress.blockedDestinations[0].host = host));
+    expect(validateReport(blocked("a".repeat(300))).ok).toBe(true);
+    expectRejected(blocked("a".repeat(301)), /host/);
+  });
+
+  it.each([
+    "a b",
+    "a/b",
+    "a\\b",
+    "a?b",
+    "a#b",
+    "a@b",
+    "a<b",
+    "a>b",
+    "caf\u00e9",
+    "a\tb",
+    "",
+    " ",
+  ])("still rejects the host %j in every place a host is shown", (host) => {
+    expectRejected(mutated((d) => (d.cookies[0].domain = host)));
+    expectRejected(
+      mutated((d) => (d.provenance.egress.blockedDestinations[0].host = host)),
+    );
+    expectRejected(asHost(host));
+  });
+
+  it("accepts a percent-encoded host in blockedDestinations, as Chromium writes a CONNECT", () => {
+    expect(
+      validateReport(
+        mutated(
+          (d) =>
+            (d.provenance.egress.blockedDestinations[0].host = "a%2ab.example"),
+        ),
+      ).ok,
+    ).toBe(true);
+    expect(
+      validateReport(
+        mutated(
+          (d) =>
+            (d.provenance.egress.blockedDestinations[0].host = "(malformed)"),
+        ),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it.each([
+    "1.0.0+sha.abc123",
+    "1.0.0-beta.1+build.5",
+    "0.1.0",
+    "156.0.8078.4",
+  ])("accepts the version %s", (version) => {
+    expect(
+      validateReport(mutated((d) => (d.provenance.scanner.version = version)))
+        .ok,
+    ).toBe(true);
+    expect(
+      validateReport(mutated((d) => (d.provenance.browser.version = version)))
+        .ok,
+    ).toBe(true);
+    expect(
+      validateReport(mutated((d) => (d.signatureSetVersion = version))).ok,
+    ).toBe(true);
+  });
+
+  it.each(["1.0 0", "1.0/0", "<1>", "+1", "", "v".repeat(65)])(
+    "rejects the version %j",
+    (version) => {
+      expectRejected(mutated((d) => (d.provenance.scanner.version = version)));
+    },
+  );
+
+  it.each([
+    "\u061c",
+    "\u2060",
+    "\u2061",
+    "\u2062",
+    "\u2063",
+    "\u2064",
+    "\u206a",
+    "\u206f",
+  ])(
+    "rejects the invisible or direction character U+%s in text",
+    (character) => {
+      expectRejected(
+        mutated((d) => (d.technologies[0].name = `a${character}b`)),
+      );
+      expectRejected(mutated((d) => (d.cookies[0].name = `a${character}b`)));
+    },
+  );
 });

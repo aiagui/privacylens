@@ -40,6 +40,12 @@ beforeAll(async () => {
           document.cookie = "\u202eevil=1; Path=/";
           try { new WebSocket("ws://chat.example:${port}/sock"); } catch {}
           fetch("http://my_cdn.example:${port}/x", { mode: "no-cors" }).catch(() => {});
+          // Hosts Node and Chromium accept but DNS would not: quote, backtick,
+          // braces, a very long name, and a "*" (Chromium writes it as %2a).
+          for (const code of [34, 96, 123, 125])
+            fetch("http://a" + String.fromCharCode(code) + "b.example:${port}/x", { mode: "no-cors" }).catch(() => {});
+          fetch("http://" + "l".repeat(400) + ".example:${port}/x", { mode: "no-cors" }).catch(() => {});
+          fetch("https://a*b.example/x", { mode: "no-cors" }).catch(() => {});
           for (let i = 0; i < 130; i++)
             fetch("http://s" + i + ".google-analytics.com:${port}/g/collect?v=2", { mode: "no-cors" }).catch(() => {});
         </script>`);
@@ -211,6 +217,19 @@ describe("a report written by the real CLI can be imported and displayed", () =>
     // Chromium hands back non-ASCII cookie names garbled, so the hostile name
     // arrives as ordinary text. Either way no unsafe character may reach the file.
     expect(hasUnsafeCharacter(content.replaceAll("\n", ""))).toBe(false);
+    // Awkward hosts are recorded as the browser wrote them, or not listed at all.
+    expect(report.thirdPartyRequests.some((r) => /[{}"`]/.test(r.domain))).toBe(
+      true,
+    );
+    expect(report.thirdPartyRequests.every((r) => r.domain.length <= 253)).toBe(
+      true,
+    );
+    expect(report.provenance?.droppedRequests).toBeGreaterThan(0);
+    expect(
+      report.provenance?.egress.blockedDestinations.some((d) =>
+        d.host.includes("%"),
+      ),
+    ).toBe(true);
     // A page cannot flood a technology's evidence past its bound.
     const analytics = report.technologies.find(
       (t) => t.name === "Google Analytics",

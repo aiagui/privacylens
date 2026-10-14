@@ -1,4 +1,4 @@
-import { isUnsafeCharacter } from "./text";
+import { isUnsafeCharacter } from "./text.ts";
 import {
   REPORT_SCHEMA_VERSION,
   type Classification,
@@ -7,7 +7,7 @@ import {
   type ScanProvenance,
   type ScanReport,
   type TechnologyFinding,
-} from "../scanner/types";
+} from "../scanner/types.ts";
 
 /**
  * Strict runtime validation of a report read from a file.
@@ -255,11 +255,15 @@ function origin(
   return raw;
 }
 
-// Host names as the URL parser produces them: letters, digits, dots, hyphens,
-// underscores (common in real host names), IPv6 brackets and colons, and the
-// other characters URLs allow in a host. No spaces, slashes, quotes or markup.
-const HOSTNAME = /^[A-Za-z0-9._~!$&'()*+,;=:[\]-]{1,300}$/;
-const COOKIE_DOMAIN = /^\.?[A-Za-z0-9._~!$&'()*+,;=:[\]-]{1,300}$/;
+// A host as Node's and Chromium's URL parsers produce it. They accept far more
+// than DNS does (underscores, quotes, braces, "%" and so on), and the scanner
+// writes whatever the browser used, so the importer accepts any printable ASCII
+// except the characters that structure a URL or open markup. Host text is only
+// ever rendered as plain text.
+const HOSTNAME = /^(?!.*[/\\?#@<>])[\x21-\x7e]{1,300}$/;
+const COOKIE_DOMAIN = HOSTNAME;
+// Versions may carry semver build metadata ("1.0.0+abc").
+const VERSION = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 const CATEGORIES = [
@@ -311,7 +315,7 @@ function technology(issues: Issues, value: unknown, path: string) {
         32,
         {
           min: 1,
-          pattern: TOKEN,
+          pattern: VERSION,
         },
       );
       if (id !== undefined && version !== undefined)
@@ -507,7 +511,7 @@ function provenance(issues: Issues, value: unknown, path: string) {
     }),
     version: text(issues, scannerRec.version, `${path}.scanner.version`, 32, {
       min: 1,
-      pattern: TOKEN,
+      pattern: VERSION,
     }),
   };
   const browserRec = record(issues, rec.browser, `${path}.browser`, [
@@ -519,7 +523,7 @@ function provenance(issues: Issues, value: unknown, path: string) {
     name: browserRec.name === "chromium" ? ("chromium" as const) : undefined,
     version: text(issues, browserRec.version, `${path}.browser.version`, 64, {
       min: 1,
-      pattern: TOKEN,
+      pattern: VERSION,
     }),
     sandbox: bool(issues, browserRec.sandbox, `${path}.browser.sandbox`),
   };
@@ -784,7 +788,7 @@ export function validateReport(input: unknown): ValidationResult {
   const signatureSetVersion = has(rec, "signatureSetVersion")
     ? text(issues, rec.signatureSetVersion, "signatureSetVersion", 32, {
         min: 1,
-        pattern: TOKEN,
+        pattern: VERSION,
       })
     : undefined;
   const provenanceValue = has(rec, "provenance")

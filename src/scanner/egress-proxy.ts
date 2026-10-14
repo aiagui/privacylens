@@ -181,7 +181,12 @@ export async function startEgressProxy(
   function recordBlock(rawHost: string, port: number, reason: BlockReason) {
     // A request too malformed to name a host is recorded under a placeholder so
     // every entry in the report has a host.
-    const host = rawHost === "" ? "(malformed)" : rawHost;
+    const host =
+      rawHost === ""
+        ? "(malformed)"
+        : // Bounded and limited to printable ASCII without URL-structure
+          // characters, so a recorded host always fits the report format.
+          rawHost.slice(0, 253).replace(/[^\x21-\x7e]|[/\\?#@<>]/g, "?");
     const key = `${host}:${port}`;
     if (POLICY_REASONS.has(reason)) {
       blockedCount += 1;

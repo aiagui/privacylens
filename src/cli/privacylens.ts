@@ -11,6 +11,7 @@ import {
 } from "../scanner/scan-live.ts";
 import type { ScanReport } from "../scanner/types.ts";
 import { isUnsafeCharacter } from "../report/text.ts";
+import { validateReport } from "../report/validate.ts";
 import { UnsafeTargetError } from "../scanner/url-policy.ts";
 
 export const EXIT = { ok: 0, failed: 1, usage: 2, refused: 3 } as const;
@@ -165,6 +166,18 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     return EXIT.failed;
   }
 
+  // The scanner is meant to write only what the web importer accepts. If a value
+  // slips through, say so now instead of leaving a file that fails to open later.
+  const check = validateReport(report);
+  if (!check.ok) {
+    const first = check.issues
+      .slice(0, 3)
+      .map((issue) => `${plain(issue.path, 80)} ${plain(issue.message, 120)}`)
+      .join("; ");
+    io.stderr(
+      `Warning: this report does not match the report format, so the web importer may refuse it (${first}). Please report this as a bug.\n`,
+    );
+  }
   const json = `${JSON.stringify(report, null, 2)}\n`;
   if (values.out) {
     try {

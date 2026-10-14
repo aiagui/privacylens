@@ -54,7 +54,8 @@ optional `signature` (`id`, `version`) naming the rule that matched.
 ### cookie
 
 `name`, `domain`, `firstParty` (boolean), `secure`, `httpOnly`, optional `expires`
-(UTC time) and optional `sameSite` (`Strict`, `Lax` or `None`). A name that looks
+(UTC time) and optional `sameSite` (`Strict`, `Lax` or `None`). At most 2,000 cookies are listed; the
+scanner says in `limitations` how many more there were. A name that looks
 like an identifier or secret, or that contains a control or direction character, is
 written as `[REDACTED]`, and a cookie set without a name as `[unnamed]`. The
 identifier check is a heuristic, and the browser can return non-ASCII cookie names
@@ -63,7 +64,9 @@ garbled, so such names may not read as the site wrote them.
 ### request
 
 `url` (an http, https, ws or wss origin; WebSocket connections are recorded as
-ws or wss), `domain` (the host of `url`), `timeMs` (milliseconds after navigation
+ws or wss), `domain` (the host of `url`, as the browser wrote it: printable ASCII without
+spaces or URL-structure characters, at most 300 characters; the scanner does not
+record longer hosts and counts them in `droppedRequests`), `timeMs` (milliseconds after navigation
 started), `beforeConsent` (always `true`: reports cover the initial page load
 only), `resourceType` (lowercase, like `script` or `fetch`), and optionally
 `technology`, `classification` and `outcome`.
