@@ -1,19 +1,93 @@
-# PrivacyLens
+![PrivacyLens — A clearer view of what follows you. Open-source privacy inspection.](public/social-preview.png)
 
-Website privacy evidence, with clear limits.
+<p align="center">
+  <a href="#explore-privacylens">Explore the product</a> ·
+  <a href="#where-were-going">Our direction</a> ·
+  <a href="#run-it-locally">Get started</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-PrivacyLens is an early open-source preview. It presents detected technologies,
-cookie attributes, third-party destinations and possible consent-management
-signals. Findings distinguish observed evidence, inference and unknowns.
+PrivacyLens is an open-source project that helps people understand the privacy
+signals of a website. It brings tracking technologies, cookies and third-party
+network activity into a readable report, with the evidence behind each finding.
 
-**Public URL scanning is disabled.** The public interface shows a bundled sample
-report. Developers can exercise the browser collector against fixed local
-fixtures. This project is not a production scanning service and does not provide
-a legal compliance verdict or privacy score.
+We want anyone to be able to ask **“What happens when I visit this site?”** and
+get a clear, useful answer. The website we're building turns browser observations
+into something people can explore, understand and question.
 
-## Run locally
+> **Product preview:** explore the bundled sample report today. Public URL
+> scanning is in development and remains disabled; its URL field is visibly inactive on the homepage.
 
-Use Node.js 24 LTS and npm:
+## Who it's for
+
+- **Curious people** who want to understand the signals behind a site's privacy choices.
+- **Website teams** who want a clearer view of the technologies and destinations their pages introduce.
+- **Researchers, educators and contributors** who want an open foundation for investigating and explaining web privacy.
+
+## Explore PrivacyLens
+
+The current web experience pairs an introduction to privacy inspection with a
+detailed, evidence-led report with an animated optical header and interactive
+request timing view. These are real screenshots of the application
+running locally, using synthetic example data.
+
+![PrivacyLens homepage: optical identity, sample report preview and an explanation of the signals.](docs/assets/home-desktop.png)
+
+**Follow a finding all the way to its evidence.** The sample report lets you explore request timings and shows detected
+technologies, cookie attributes, third-party destinations and possible consent
+manager signals from the initial page load. Each finding is labeled observed,
+inferred or unknown.
+
+<details>
+<summary>Explore the full report: optical header, interactive request window and detailed evidence</summary>
+
+![The sample report with its optical header, interactive request timings, evidence labels, cookies and network inventory.](docs/assets/report-desktop.png)
+
+</details>
+
+[View the mobile homepage](docs/assets/home-mobile.png) ·
+[View the mobile report](docs/assets/report-mobile.png)
+
+After [starting the app](#run-it-locally), open
+the sample report (`/sample` when running locally). It is bundled demonstration
+data, with no live website scanned.
+
+## Evidence you can understand
+
+| Signal                | What PrivacyLens brings into view                                                 |
+| --------------------- | --------------------------------------------------------------------------------- |
+| Tracking technologies | Recognized technologies, their categories and the evidence supporting detection.  |
+| Cookies               | First- and third-party domains, expiry, Secure, HttpOnly and SameSite attributes. |
+| Network activity      | Third-party destinations and request timing before consent interaction.           |
+| Consent signals       | Possible consent manager presence, with the supporting signal.                    |
+
+Every report separates **observed** browser evidence, **inferred**
+interpretations and what remains **unknown**. PrivacyLens does not assign privacy
+scores or make legal compliance verdicts.
+
+**Available now:** the homepage, a deterministic sample report and a browser
+collector that developers can exercise against fixed local fixtures.
+The sample illustrates the report format; it is not a measurement of a real site.
+
+## Where we're going
+
+Our ambition is a more readable web: privacy inspection that people can use
+without needing to become browser specialists.
+
+| Direction               | What we're working toward                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Safe website inspection | Isolated scanning with infrastructure-enforced network boundaries before public URL input becomes available. |
+| Deeper evidence         | Broader technology coverage, clearer detection explanations and explicit observation limits.                 |
+| More useful reports     | Accessible exploration, report export and comparison across observation windows.                             |
+| An open foundation      | Documentation, reproducible fixtures and a contribution path for detectors, design and language.             |
+
+These are planned directions, not released features or delivery promises.
+Read the [product direction](docs/product-direction.md) for the current
+foundation, next steps and release gates.
+
+## Run it locally
+
+Use **Node.js 24 LTS** and npm:
 
 ```sh
 npm ci
@@ -21,45 +95,23 @@ npx playwright install chromium
 npm run dev
 ```
 
-Open <http://127.0.0.1:3000>. The sample report at `/sample` uses synthetic data.
-Outside production, `GET /api/dev/scan-fixture` lists fixed fixture IDs and
-`POST /api/dev/scan-fixture` accepts `{"fixtureId":"baseline"}`. It never accepts
-a target URL. Keep the development server bound to loopback.
+Open <http://127.0.0.1:3000> after `npm run dev`, then choose **Explore a sample report**.
+No accounts, API keys or environment files are needed.
 
-## Verify
+For fixture development, verification commands and the project map, see
+[the development guide](docs/development.md). The development server stays on
+loopback; public scanning remains disabled.
 
-```sh
-npm run check:publication
-npm run format:check
-npm run lint
-npm run typecheck
-npm test
-npm run audit
-npm run build
-npm run test:e2e
-```
+## Build it with us
 
-Scanner tests need Playwright Chromium. On Linux use
-`npx playwright install --with-deps chromium`. Publication checks inspect the Git
-index; stage intended files before running them. Gitleaks scans tracked history
-in CI; run `gitleaks git --redact` before pushing.
+Help improve the explanations, test report accessibility, add reproducible
+detector fixtures or shape the next product capabilities. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md), open an
+[issue](https://github.com/aiagui/privacylens/issues), or propose a focused pull request.
 
-## Project map
+Explore the [architecture](docs/architecture.md),
+[security boundaries](docs/security.md) and
+[visual identity](docs/visual-identity.md). To report a vulnerability privately,
+follow [SECURITY.md](SECURITY.md).
 
-| Location               | Responsibility                                               |
-| ---------------------- | ------------------------------------------------------------ |
-| `src/app`              | Pages and thin HTTP adapters                                 |
-| `src/components`       | Report presentation                                          |
-| `src/scanner`          | Collection, detection, URL policy and shared report contract |
-| `src/sample-report.ts` | Deterministic demonstration data                             |
-| `tests`                | Unit, route, browser integration and publication regressions |
-| `scripts`              | Publication guard and production browser smoke tests         |
-| `docs`                 | Architecture, threat model and release procedure             |
-| `.github`              | CI, CodeQL, secret detection and manual source releases      |
-
-See [architecture](docs/architecture.md), [security boundaries](docs/security.md),
-[development](docs/development.md) and [CI and releases](docs/ci-and-releases.md).
-Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities
-privately using [SECURITY.md](SECURITY.md).
-
-MIT licensed; see [LICENSE](LICENSE).
+PrivacyLens is [MIT licensed](LICENSE). Follow the signals. Understand the evidence.
