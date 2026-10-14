@@ -1,10 +1,6 @@
 import { chromium } from "playwright";
-import {
-  detectTechnology,
-  isThirdParty,
-  isTrackingRequest,
-  safeDestination,
-} from "./detectors";
+import { assessRequest, isThirdParty, safeDestination } from "./detectors";
+import { SIGNATURE_SET_VERSION } from "./signatures";
 import type { RequestFinding, ScanReport, TechnologyFinding } from "./types";
 import { UnsafeTargetError, validateFixtureUrl } from "./url-policy";
 
@@ -75,16 +71,16 @@ export async function scanFixture(
       }
 
       const thirdParty = isThirdParty(url.hostname, requestUrl.hostname);
-      const detected = detectTechnology(requestUrl);
-      if (detected) {
-        const tracking = isTrackingRequest(requestUrl, request.resourceType());
+      const assessment = assessRequest(requestUrl, request.resourceType());
+      const detected = assessment.technology;
+      const tracking = assessment.classification === "observed";
+      if (detected && assessment.signature) {
         if (tracking && thirdParty) trackingBeforeInteraction = true;
         const existing = technologies.get(detected.name);
-        const evidence = tracking
-          ? `Tracking request initiated to ${safeDestination(requestUrl)} (blocked by fixture policy)`
-          : `Resource requested from ${safeDestination(requestUrl)} (blocked if outside fixture)`;
+        const evidence = `${assessment.reason} Destination: ${safeDestination(requestUrl)}`;
         technologies.set(detected.name, {
           ...detected,
+          signature: assessment.signature,
           observation: tracking
             ? "observed"
             : (existing?.observation ?? "inferred"),
@@ -99,6 +95,7 @@ export async function scanFixture(
           timeMs: Date.now() - startedAt,
           beforeConsent: true,
           resourceType: request.resourceType(),
+          classification: assessment.classification,
         });
       }
 
@@ -172,6 +169,7 @@ export async function scanFixture(
       targetUrl: url.origin,
       scannedAt: new Date().toISOString(),
       status: "completed",
+      signatureSetVersion: SIGNATURE_SET_VERSION,
       technologies: [...technologies.values()],
       cookies,
       thirdPartyRequests,
@@ -190,6 +188,7 @@ export async function scanFixture(
         "This result covers only the initial page load. No consent choice was made.",
         "Third-party requests were observed at browser initiation but blocked before network delivery.",
         "HTTP redirects are blocked, including same-origin redirects; non-success navigation responses do not produce a completed report.",
+        "Destinations marked unknown matched no recognized signature; that does not mean they are harmless or that they track.",
         "CMP presence is inferred from known DOM selectors; absence is not proof that consent is unnecessary.",
         "No GDPR compliance conclusion or privacy score is provided.",
       ],
