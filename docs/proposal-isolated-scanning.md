@@ -30,12 +30,12 @@ the browser, the page or the application code is compromised.
 
 ## Deployment options (to be decided)
 
-| Option                                | Isolation                      | Ops burden | Notes                                                                   |
-| ------------------------------------- | ------------------------------ | ---------- | ----------------------------------------------------------------------- |
-| A. Firecracker-style microVM per job  | Potentially strongest          | High       | Needs own host fleet or a provider offering it                          |
-| B. Managed container sandbox (gVisor) | Strong (unvalidated)           | Medium     | Egress rules must be enforced at the VPC/firewall, not in the container |
-| C. Short-lived VM per job             | Strong, slow start             | Medium     | Simple to reason about; higher per-scan cost and latency                |
-| D. Run scans only locally (CLI)       | User's own machine and network | Low        | No hosted risk, but inherits the user's network; document the limits    |
+| Option                                | Isolation                        | Ops burden | Notes                                                                   |
+| ------------------------------------- | -------------------------------- | ---------- | ----------------------------------------------------------------------- |
+| A. Firecracker-style microVM per job  | Potentially strongest            | High       | Needs own host fleet or a provider offering it                          |
+| B. Managed container sandbox (gVisor) | Strong (unvalidated)             | Medium     | Egress rules must be enforced at the VPC/firewall, not in the container |
+| C. Short-lived VM per job             | Strong (unvalidated), slow start | Medium     | Simple to reason about; higher per-scan cost and latency                |
+| D. Run scans only locally (CLI)       | User's own machine and network   | Low        | No hosted risk, but inherits the user's network; document the limits    |
 
 No option is selected, and the isolation ratings above are qualitative and
 unvalidated. Each option must pass the acceptance tests below to be considered. Provider, region,
