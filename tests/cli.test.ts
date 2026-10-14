@@ -321,4 +321,17 @@ describe("cli report-format safeguard", () => {
     await runCli(["scan", "https://example.com"], h.io);
     expect(h.err.join("")).not.toMatch(/Warning/);
   });
+
+  it("judges the report as written: an undefined optional field in memory is not a problem", async () => {
+    const report = JSON.parse(JSON.stringify(SAMPLE_REPORT));
+    // JSON.stringify drops this key, so the written file is perfectly valid.
+    report.thirdPartyRequests[4].technology = undefined;
+    report.thirdPartyRequests[4].classification = "unknown";
+    const h = harness(async () => report);
+    expect(await runCli(["scan", "https://example.com"], h.io)).toBe(EXIT.ok);
+    expect(h.err.join("")).not.toMatch(/Warning/);
+    expect(JSON.parse(h.out.join("")).thirdPartyRequests[4]).not.toHaveProperty(
+      "technology",
+    );
+  });
 });

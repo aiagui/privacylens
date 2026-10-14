@@ -166,9 +166,12 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     return EXIT.failed;
   }
 
+  const json = `${JSON.stringify(report, null, 2)}\n`;
   // The scanner is meant to write only what the web importer accepts. If a value
   // slips through, say so now instead of leaving a file that fails to open later.
-  const check = validateReport(report);
+  // Check the text that is actually written, not the in-memory object: JSON drops
+  // keys whose value is undefined, so only the written form is what gets imported.
+  const check = validateReport(JSON.parse(json));
   if (!check.ok) {
     const first = check.issues
       .slice(0, 3)
@@ -178,7 +181,6 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       `Warning: this report does not match the report format, so the web importer may refuse it (${first}). Please report this as a bug.\n`,
     );
   }
-  const json = `${JSON.stringify(report, null, 2)}\n`;
   if (values.out) {
     try {
       writeFileSync(values.out, json, { flag: values.force ? "w" : "wx" });

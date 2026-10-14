@@ -494,7 +494,8 @@ export async function scanLive(
         thirdPartyRequests.push({
           url: safeDestination(raw.url),
           domain: raw.url.hostname,
-          technology: delivered ? detected?.name : undefined,
+          // Absent, not undefined, when nothing was recognized or delivered.
+          ...(delivered && detected ? { technology: detected.name } : {}),
           timeMs: raw.timeMs,
           beforeConsent: true,
           resourceType: raw.resourceType,

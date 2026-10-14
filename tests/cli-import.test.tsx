@@ -9,7 +9,7 @@ import { ReportView } from "../src/components/report-view";
 import { MAX_REPORT_BYTES, parseReportText } from "../src/report/import";
 import { hasUnsafeCharacter } from "../src/report/text";
 import { scanLive } from "../src/scanner/scan-live";
-import { REPORT_SCHEMA_VERSION } from "../src/scanner/types";
+import { REPORT_SCHEMA_VERSION, type ScanReport } from "../src/scanner/types";
 import { resolveSandbox } from "./helpers/sandbox";
 
 /**
@@ -21,6 +21,15 @@ let server: Server;
 let port = 0;
 let sandbox = true;
 let dir = "";
+
+/** Paths of any key whose value is undefined: JSON would silently drop them. */
+function undefinedPaths(value: unknown, path = "report"): string[] {
+  if (value === undefined) return [path];
+  if (value === null || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([key, child]) =>
+    undefinedPaths(child, `${path}.${key}`),
+  );
+}
 
 beforeAll(async () => {
   sandbox = await resolveSandbox("tests/cli-import.test.tsx");
@@ -98,6 +107,7 @@ describe("a report written by the real CLI can be imported and displayed", () =>
       },
     );
     expect(code, err.join("")).toBe(EXIT.ok);
+    expect(err.join("")).not.toMatch(/Warning/);
 
     const content = readFileSync(out, "utf8");
     expect(statSync(out).size).toBeLessThan(MAX_REPORT_BYTES);
@@ -172,6 +182,7 @@ describe("a report written by the real CLI can be imported and displayed", () =>
   it("imports the report from a page that does every awkward thing a real site can", async () => {
     const out = join(dir, "everything.json");
     const err: string[] = [];
+    let captured: ScanReport | undefined;
     const code = await runCli(
       [
         "scan",
@@ -185,8 +196,8 @@ describe("a report written by the real CLI can be imported and displayed", () =>
         stdout: () => undefined,
         stderr: (t) => err.push(t),
         version: "0.1.0",
-        scan: (target, options) =>
-          scanLive(target, {
+        scan: async (target, options) => {
+          const scanned = await scanLive(target, {
             ...options,
             chromiumSandbox: sandbox,
             egress: {
@@ -195,10 +206,18 @@ describe("a report written by the real CLI can be imported and displayed", () =>
               },
               resolve: async () => [{ address: "127.0.0.1", family: 4 }],
             },
-          }),
+          });
+          captured = scanned;
+          return scanned;
+        },
       },
     );
     expect(code, err.join("")).toBe(EXIT.ok);
+    // The CLI's own check of the written file must not cry wolf on a real scan.
+    expect(err.join("")).not.toMatch(/Warning/);
+    // And the scanner never leaves an undefined-valued key: JSON would silently
+    // drop it, and the in-memory report would differ from the written one.
+    expect(undefinedPaths(captured)).toEqual([]);
     const content = readFileSync(out, "utf8");
     const imported = parseReportText(content);
     // The regression guard: whatever the scanner can emit must import.
