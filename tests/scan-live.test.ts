@@ -12,6 +12,7 @@ import {
 } from "../src/scanner/scan-live";
 import { UnsafeTargetError } from "../src/scanner/url-policy";
 import { browserTree, listProcesses } from "../src/scanner/browser-process";
+import { sandboxAvailable } from "./helpers/sandbox";
 import type { EgressOptions } from "../src/scanner/egress-proxy";
 
 /**
@@ -64,18 +65,11 @@ beforeAll(async () => {
   await new Promise<void>((done) => probe.listen(0, "127.0.0.1", done));
   closedPort = (probe.address() as { port: number }).port;
   await new Promise((done) => probe.close(done));
-  try {
-    const trial = await chromium.launch({
-      headless: true,
-      chromiumSandbox: true,
-    });
-    await trial.close();
-  } catch {
-    sandboxOK = false;
+  sandboxOK = await sandboxAvailable();
+  if (!sandboxOK)
     console.warn(
       "Chromium sandbox cannot start here; scanner tests run without it",
     );
-  }
   internalServer = createServer((_req, res) => {
     internalRequests += 1;
     res.end("internal-secret");
@@ -293,10 +287,16 @@ describe("scanLive default egress policy", () => {
     await new Promise<void>((done) => probe.listen(0, "127.0.0.1", done));
     const port = (probe.address() as { port: number }).port;
     await expect(
-      scanLive(`http://127.0.0.1:${port}/`, { timeoutMs: 15_000 }),
+      scanLive(`http://127.0.0.1:${port}/`, {
+        timeoutMs: 15_000,
+        chromiumSandbox: sandboxOK,
+      }),
     ).rejects.toBeInstanceOf(UnsafeTargetError);
     await expect(
-      scanLive(`http://localhost:${port}/`, { timeoutMs: 15_000 }),
+      scanLive(`http://localhost:${port}/`, {
+        timeoutMs: 15_000,
+        chromiumSandbox: sandboxOK,
+      }),
     ).rejects.toBeInstanceOf(UnsafeTargetError);
     await new Promise((done) => probe.close(done));
     expect(hits).toBe(0);
@@ -305,6 +305,7 @@ describe("scanLive default egress policy", () => {
   it("reports an unresolvable name as a failure, not as a safety refusal", async () => {
     const error = await scanLive("http://no-such-host.invalid/", {
       timeoutMs: 15_000,
+      chromiumSandbox: sandboxOK,
       egress: { resolve: async () => Promise.reject(new Error("ENOTFOUND")) },
     }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
@@ -321,7 +322,7 @@ describe("scanLive default egress policy", () => {
     "refuses private target %s",
     async (target) => {
       await expect(
-        scanLive(target, { timeoutMs: 15_000 }),
+        scanLive(target, { timeoutMs: 15_000, chromiumSandbox: sandboxOK }),
       ).rejects.toBeInstanceOf(UnsafeTargetError);
     },
     25_000,

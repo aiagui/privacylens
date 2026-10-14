@@ -30,6 +30,12 @@ jobs:
       - run: npm run check:publication
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      # Ubuntu 24.04 runners restrict unprivileged user namespaces, which stops
+      # Chromium's process sandbox from starting. Relaxing that on this
+      # ephemeral hosted VM lets the sandbox tests exercise the real sandbox.
+      # If it cannot be relaxed the tests fall back to saying so explicitly.
+      - name: Allow Chromium's sandbox to start
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || echo "could not relax the user-namespace restriction; sandbox tests will run without the sandbox"
       - run: npm run check
   secrets:
     name: Secret detection

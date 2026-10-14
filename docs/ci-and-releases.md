@@ -9,7 +9,9 @@ full Git history with Gitleaks. CodeQL analyzes JavaScript/TypeScript and Action
 Weekly runs check for dependency/security drift; Dependabot proposes npm and
 Actions updates. Workflow actions are pinned to verified full commit SHAs.
 
-Jobs run on GitHub-hosted runners with timeouts. The default token can only read
+Jobs run on GitHub-hosted runners with timeouts. The Quality job relaxes the runner's
+unprivileged-user-namespace restriction so Chromium's process sandbox can start and
+the scanner's sandbox tests exercise it; this changes only the ephemeral VM. The default token can only read
 contents; CodeQL alone can write security results. Checkout credentials are not
 persisted. No `pull_request_target` or automatic deployment is used. Forked pull
 requests receive no deployment secrets.
