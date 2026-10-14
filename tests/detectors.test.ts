@@ -49,6 +49,27 @@ describe("endpoint matching uses whole path segments", () => {
     expect(isTrackingRequest(new URL(address), "fetch")).toBe(false);
   });
 
+  it.each([
+    "https://analytics.tiktok.com/api/v2/pixel",
+    "https://analytics.tiktok.com/api/v2/pixel/act",
+    "https://analytics.tiktok.com/api/v2/pixel/batch",
+  ])("still treats TikTok pixel call %s as collection", (address) => {
+    const url = new URL(address);
+    expect(detectTechnology(url)?.name).toBe("TikTok Pixel");
+    expect(isTrackingRequest(url, "fetch")).toBe(true);
+  });
+
+  it.each([
+    "https://www.facebook.com/groups/tr",
+    "https://www.linkedin.com/in/px",
+    "https://www.linkedin.com/in/collect",
+  ])(
+    "does not attribute nested profile or group path %s to a vendor",
+    (address) => {
+      expect(detectTechnology(new URL(address))).toBeUndefined();
+    },
+  );
+
   it("does not attribute ordinary pages to a vendor by path prefix", () => {
     expect(detectTechnology(new URL(ordinary[0]!))).toBeUndefined();
     expect(detectTechnology(new URL(ordinary[2]!))).toBeUndefined();
@@ -62,6 +83,8 @@ describe("endpoint matching uses whole path segments", () => {
     ["https://www.google-analytics.com/j/collect?v=1", "Google Analytics"],
     ["https://px.ads.linkedin.com/collect?pid=1", "LinkedIn Insight Tag"],
     ["https://stats.example.org/matomo.php?idsite=1", "Matomo"],
+    ["https://stats.example.org/matomo.php/", "Matomo"],
+    ["https://analytics.google.com/g/collect?v=2", "Google Analytics"],
   ])("still recognizes %s", (address, name) => {
     expect(detectTechnology(new URL(address))?.name).toBe(name);
   });

@@ -13,7 +13,7 @@ const signatures: Signature[] = [
   {
     name: "Google Analytics",
     category: "analytics",
-    domains: ["google-analytics.com"],
+    domains: ["google-analytics.com", "analytics.google.com"],
     path: /(?:^|\/)(?:[gjr]\/collect|collect|analytics\.js)\/?$/i,
   },
   {
@@ -30,7 +30,7 @@ const signatures: Signature[] = [
     name: "Meta Pixel",
     category: "advertising",
     domains: ["facebook.com", "facebook.net"],
-    path: /(?:^|\/)(?:tr|fbevents\.js)\/?$/i,
+    path: /^\/(?:tr\/?$|(?:.*\/)?fbevents\.js$)/i,
   },
   {
     name: "TikTok Pixel",
@@ -41,7 +41,7 @@ const signatures: Signature[] = [
     name: "LinkedIn Insight Tag",
     category: "advertising",
     domains: ["licdn.com", "linkedin.com"],
-    path: /(?:^|\/)(?:insight(?:\.min)?\.js|collect|px)\/?$/i,
+    path: /^\/(?:(?:collect|px)\/?$|(?:.*\/)?insight(?:\.min)?\.js$)/i,
   },
   {
     name: "Microsoft Clarity",
@@ -57,7 +57,7 @@ const signatures: Signature[] = [
     name: "Matomo",
     category: "analytics",
     domains: [],
-    path: /(?:^|\/)(?:matomo|piwik)\.(?:js|php)$/i,
+    path: /(?:^|\/)(?:matomo|piwik)\.(?:js|php)\/?$/i,
   },
 ];
 
@@ -99,7 +99,7 @@ export function isTrackingRequest(url: URL, resourceType: string): boolean {
   if (resourceType === "script") return false;
   // Match whole trailing path segments: "/trending" or "/events/123" are
   // ordinary pages, not collection endpoints.
-  return /(?:^|\/)(?:[gjr]\/collect|collect|tr|events?|pixel|px|matomo\.php|piwik\.php)\/?$/i.test(
+  return /(?:^|\/)(?:[gjr]\/collect|collect|tr|events?|px|(?:matomo|piwik)\.php|pixel(?:\/[^/]+)*)\/?$/i.test(
     url.pathname,
   );
 }

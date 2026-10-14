@@ -10,8 +10,11 @@ current scope needs one application rather than a monorepo or microservices.
    canonical `ScanReport` contract from `src/scanner/types.ts`.
 3. `src/scanner/detectors.ts` classifies known signatures and reduces destinations
    to origins. A requested script alone does not establish a tracking request, and
-   endpoint patterns match whole trailing path segments, so ordinary pages such as
-   `/trending` or `/events/123` are never reported as collection requests.
+   endpoint patterns match whole path segments, so ordinary pages such as
+   `/trending` or `/events/123` on a recognized vendor host are not reported as
+   collection requests. Vendors without a path pattern (e.g. TikTok, Plausible) are
+   still gated only by the generic endpoint list, so the signature list remains
+   heuristic and incomplete.
 4. `src/scanner/scan-fixture.ts` collects browser initiation evidence from a
    caller-owned loopback HTTP fixture. External requests and redirects are blocked.
 5. `src/scanner/dev-fixtures.ts` owns fixed HTML, starts its own loopback server and
