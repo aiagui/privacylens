@@ -32,13 +32,13 @@ the browser, the page or the application code is compromised.
 
 | Option                                | Isolation                      | Ops burden | Notes                                                                   |
 | ------------------------------------- | ------------------------------ | ---------- | ----------------------------------------------------------------------- |
-| A. Firecracker-style microVM per job  | Strongest                      | High       | Needs own host fleet or a provider offering it                          |
-| B. Managed container sandbox (gVisor) | Strong                         | Medium     | Egress rules must be enforced at the VPC/firewall, not in the container |
+| A. Firecracker-style microVM per job  | Potentially strongest          | High       | Needs own host fleet or a provider offering it                          |
+| B. Managed container sandbox (gVisor) | Strong (unvalidated)           | Medium     | Egress rules must be enforced at the VPC/firewall, not in the container |
 | C. Short-lived VM per job             | Strong, slow start             | Medium     | Simple to reason about; higher per-scan cost and latency                |
 | D. Run scans only locally (CLI)       | User's own machine and network | Low        | No hosted risk, but inherits the user's network; document the limits    |
 
-No option is selected. Options B and C use commodity pieces and fit a limited
-beta; option D needs no hosting and could proceed in parallel. Provider, region,
+No option is selected, and the isolation ratings above are qualitative and
+unvalidated. Each option must pass the acceptance tests below to be considered. Provider, region,
 budget, authentication model, retention period and CLI-versus-hosted scanning are
 all open decisions for the maintainer.
 
@@ -62,7 +62,7 @@ quotas are part of the design regardless of the numbers.
 
 ## Abuse prevention
 
-- Authentication (invite or account) before any scan; no anonymous scanning at launch.
+- Some form of access control before any scan (invite, account or other); the model is an open decision, and anonymous access would need stronger limits.
 - Per-account and per-IP quotas, global concurrency cap, queue depth cap, spend alarm
   with automatic shutoff.
 - Per-job budgets: wall-clock, memory, process count, request count, total bytes.
@@ -72,7 +72,7 @@ quotas are part of the design regardless of the numbers.
 
 ## Data handling
 
-Retain the report only as long as the user needs it (proposed: 7 days, user-deletable).
+Retain the report only as long as needed, with user-initiated deletion; the retention period is an open decision.
 Log job IDs, timing and outcome codes, never URLs with paths/queries, cookie values,
 headers or bodies. No third-party analytics. Publish a plain-language privacy notice.
 
