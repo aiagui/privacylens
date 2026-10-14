@@ -1,10 +1,13 @@
-export type Observation = "observed" | "inferred";
+export type Classification = "observed" | "inferred" | "unknown";
+export type Observation = Exclude<Classification, "unknown">;
 
 export interface TechnologyFinding {
   name: string;
   category: "analytics" | "advertising" | "tag-manager" | "session-replay";
   evidence: string[];
   observation: Observation;
+  /** Signature that produced this finding; absent on bundled sample data. */
+  signature?: { id: string; version: string };
 }
 
 export interface CookieFinding {
@@ -24,6 +27,8 @@ export interface RequestFinding {
   timeMs: number;
   beforeConsent: true;
   resourceType: string;
+  /** Whether this destination is a recognized collection endpoint, resource, or unexplained. */
+  classification?: Classification;
 }
 
 export interface ScanReport {
@@ -36,4 +41,5 @@ export interface ScanReport {
   cmp: { detected: boolean; name?: string; evidence?: string };
   concerns: { title: string; detail: string; level: "info" | "attention" }[];
   limitations: string[];
+  signatureSetVersion?: string;
 }

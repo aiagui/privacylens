@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scanFixture } from "../src/scanner/scan-fixture";
+import { SIGNATURE_SET_VERSION, signatures } from "../src/scanner/signatures";
 
 let origin: string;
 let redirectedOrigin: string;
@@ -42,6 +43,19 @@ const server = createServer((request, response) => {
   if (request.url === "/server-error") {
     response.writeHead(500);
     response.end("synthetic server error");
+    return;
+  }
+  if (request.url === "/ordinary-pages") {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end(`<!doctype html><title>Ordinary</title><script>
+      for (const url of [
+        "https://www.facebook.com/trending",
+        "https://www.facebook.com/events/123",
+        "https://www.google-analytics.com/collectibles",
+        "https://www.linkedin.com/pxyz",
+        "https://www.tiktok.com/events/foo",
+      ]) fetch(url).catch(() => {});
+    </script>`);
     return;
   }
   if (request.url === "/script-only") {
@@ -94,6 +108,31 @@ describe("browser fixture scan", () => {
     expect(report.concerns).toEqual([]);
   }, 20_000);
 
+  it("does not raise a tracking concern for ordinary third-party requests", async () => {
+    const report = await scanFixture(`${origin}/ordinary-pages`, origin);
+    expect(report.thirdPartyRequests.length).toBeGreaterThanOrEqual(5);
+    expect(report.concerns).toEqual([]);
+    expect(
+      report.technologies.filter((tech) => tech.observation === "observed"),
+    ).toEqual([]);
+    expect(
+      report.thirdPartyRequests.every(
+        (request) => request.classification === "unknown",
+      ),
+    ).toBe(true);
+    expect(report.signatureSetVersion).toBeTruthy();
+  }, 20_000);
+
+  it("still raises the concern for a genuine collection request", async () => {
+    const report = await scanFixture(origin, origin);
+    expect(report.concerns).toEqual([
+      expect.objectContaining({
+        title: "Tracking before interaction",
+        level: "attention",
+      }),
+    ]);
+  }, 20_000);
+
   it("records pre-interaction evidence without leaking cookie values or query strings", async () => {
     const report = await scanFixture(origin, origin);
     expect(report.cookies).toEqual(
@@ -119,6 +158,18 @@ describe("browser fixture scan", () => {
         (request) => request.domain === "www.google-analytics.com",
       ),
     ).toBe(true);
+    // Every detection must be reproducible: a registered signature at the
+    // report's version, and a non-empty documented reason.
+    expect(report.signatureSetVersion).toBe(SIGNATURE_SET_VERSION);
+    for (const technology of report.technologies) {
+      expect(signatures.some((s) => s.id === technology.signature?.id)).toBe(
+        true,
+      );
+      expect(technology.signature?.version).toBe(SIGNATURE_SET_VERSION);
+      expect(technology.evidence.length).toBeGreaterThan(0);
+      for (const line of technology.evidence)
+        expect(line.length).toBeGreaterThan(20);
+    }
     expect(JSON.stringify(report)).not.toContain("private-token");
     expect(JSON.stringify(report)).not.toContain("essential=yes");
   }, 20_000);

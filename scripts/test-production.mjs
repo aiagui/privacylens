@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import console from "node:console";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { createServer } from "node:net";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -90,17 +92,156 @@ try {
   await page.goto(origin);
   await page.getByRole("heading", { level: 1 }).waitFor();
   assert.equal(await page.locator("form").count(), 0);
+  assert.equal(
+    await page
+      .getByRole("textbox", { name: "Inspect a website", exact: true })
+      .isDisabled(),
+    true,
+  );
+  assert.equal(
+    await page.getByRole("button", { name: "Scan website" }).isDisabled(),
+    true,
+  );
   assert.match(
     await page.locator("main").innerText(),
     /public URL scanning is not available/i,
   );
-  await page.getByRole("link", { name: /with sample data/ }).click();
+  await page.getByRole("link", { name: "Explore a sample report" }).click();
   await page.getByRole("heading", { name: "What we observed" }).waitFor();
   assert.match(await page.getByRole("note").innerText(), /Sample data/);
   assert.match(await page.locator("main").innerText(), /sample-shop.example/);
+  await page.getByRole("button", { name: /Google Analytics/ }).click();
+  assert.match(
+    await page.locator(".journey-detail").innerText(),
+    /Google Analytics/,
+  );
+  assert.match(await page.locator(".journey-detail").innerText(), /fetch/);
+  assert.match(await page.locator(".journey-detail").innerText(), /OBSERVED/);
+  assert.match(
+    await page.locator(".journey-detail").innerText(),
+    /Whether data arrived/,
+  );
+  // An unrecognized destination must display UNKNOWN, never a guess.
+  await page
+    .getByRole("button", { name: /cdn\.assets-sample\.example/ })
+    .click();
+  const unknownDetail = await page.locator(".journey-detail").innerText();
+  assert.match(unknownDetail, /UNKNOWN/);
+  assert.match(unknownDetail, /not established/);
+  assert.doesNotMatch(unknownDetail, /Before interaction|Before consent/);
+  const reportText = await page.locator("main").innerText();
+  assert.match(reportText, /signature google-analytics, set /);
+  assert.doesNotMatch(reportText, /Before consent interaction|Behind the page/);
+  await page.getByRole("button", { name: /Google Analytics/ }).click();
+  assert.equal(
+    await page
+      .getByRole("button", { name: /Google Analytics/ })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  await page.getByRole("button", { name: "Pause motion" }).click();
+  assert.equal(
+    await page
+      .locator(".field-orbits")
+      .evaluate((node) => globalThis.getComputedStyle(node).animationPlayState),
+    "paused",
+  );
   assert.deepEqual(external, []);
   assert.deepEqual(errors, []);
-  console.log("Production browser smoke checks passed.");
+  // Check presentation behavior against the production build.
+  await page.goto(origin);
+  await page.getByRole("button", { name: "Pause motion" }).click();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Resume motion" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.equal(
+    await page
+      .locator(".field-orbits")
+      .evaluate((node) => globalThis.getComputedStyle(node).animationPlayState),
+    "paused",
+  );
+  await page.getByRole("button", { name: "Resume motion" }).click();
+  assert.equal(
+    await page
+      .locator(".field-orbits")
+      .evaluate((node) => globalThis.getComputedStyle(node).animationPlayState),
+    "running",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  assert.equal(
+    await page
+      .locator(".field-orbits")
+      .evaluate((node) => globalThis.getComputedStyle(node).animationName),
+    "none",
+  );
+  assert.equal(
+    await page.getByRole("button", { name: "Pause motion" }).isVisible(),
+    false,
+  );
+  const screenshotDir = process.env.PRIVACYLENS_SCREENSHOT_DIR;
+  if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
+  for (const [name, width, height] of [
+    ["desktop", 1440, 1000],
+    ["mobile", 390, 844],
+    ["narrow", 320, 720],
+  ]) {
+    await page.setViewportSize({ width, height });
+    for (const [view, path] of [
+      ["home", "/"],
+      ["report", "/sample"],
+    ]) {
+      await page.goto(origin + path);
+      await page.evaluate(() => globalThis.document.fonts.ready);
+      assert.equal(await page.getByRole("heading", { level: 1 }).count(), 1);
+      assert.ok(
+        await page.evaluate(
+          () =>
+            globalThis.document.documentElement.scrollWidth <=
+            globalThis.innerWidth,
+        ),
+        "Page must fit viewport",
+      );
+      if (view === "report") {
+        assert.equal(
+          await page
+            .getByRole("region", { name: "Cookie attributes" })
+            .getAttribute("tabindex"),
+          "0",
+        );
+        assert.equal(
+          await page
+            .getByRole("region", { name: "Third-party request details" })
+            .getAttribute("tabindex"),
+          "0",
+        );
+        assert.match(
+          await page.locator("main").innerText(),
+          /Example timestamp.*UTC/,
+        );
+      }
+      if (screenshotDir && name !== "narrow")
+        await page.screenshot({
+          path: join(screenshotDir, view + "-" + name + ".png"),
+          fullPage: true,
+        });
+    }
+  }
+  await page.goto(origin);
+  await page.keyboard.press("Tab");
+  assert.equal(await page.locator(":focus").innerText(), "Skip to content");
+  await page.keyboard.press("Enter");
+  assert.equal(
+    await page.evaluate(() => globalThis.document.activeElement?.id),
+    "main-content",
+  );
+  assert.deepEqual(external, []);
+  assert.deepEqual(errors, []);
+  console.log(
+    "Production browser, responsive layout and accessibility smoke checks passed.",
+  );
 } finally {
   await browser?.close();
   if (child.exitCode === null) {

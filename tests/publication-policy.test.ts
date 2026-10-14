@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,10 +22,14 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(repository, { recursive: true, force: true }));
 
-function write(path: string, tracked = true) {
+function write(
+  path: string,
+  tracked = true,
+  content: string | Buffer = "Synthetic test content.\n",
+) {
   const destination = join(repository, path);
   mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, "Synthetic test content.\n");
+  writeFileSync(destination, content);
   if (tracked) {
     execFileSync("git", ["add", "--force", "--", path], { cwd: repository });
     const paths = execFileSync("git", ["ls-files"], {
@@ -44,6 +54,35 @@ function check() {
 }
 
 describe("publication policy", () => {
+  it("allows the exact reviewed public assets", () => {
+    for (const path of [
+      "docs/assets/home-desktop.png",
+      "docs/assets/home-mobile.png",
+      "docs/assets/report-desktop.png",
+      "docs/assets/report-mobile.png",
+      "public/icon.svg",
+      "public/social-preview.png",
+      "public/fonts/manrope-latin.ttf",
+      "public/fonts/OFL.txt",
+    ])
+      write(path, true, readFileSync(new URL("../" + path, import.meta.url)));
+    expect(check().status).toBe(0);
+  });
+
+  it("rejects changed assets and arbitrary images even with an inventory update", () => {
+    write("public/icon.svg", true, "<svg><script>unreviewed()</script></svg>");
+    write("docs/assets/private-capture.png", true, Buffer.from([0, 1, 2]));
+    const result = check();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Unreviewed asset content");
+    expect(result.stderr).toContain("private-capture.png");
+  });
+
+  it("rejects binary content outside reviewed assets", () => {
+    write("src/components/example.tsx", true, Buffer.from([0, 1, 2]));
+    expect(check().status).toBe(1);
+  });
+
   it("allows product source, technical docs and public configuration", () => {
     for (const path of [
       "src/app/page.tsx",

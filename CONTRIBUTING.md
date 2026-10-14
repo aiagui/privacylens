@@ -2,7 +2,7 @@
 
 Open a focused pull request against `main`. Describe the behavior and its privacy
 implications, use deterministic fixtures, and add regression tests for changes.
-Run the verification commands in the README before requesting review.
+Run npm run check and the secret scan described in docs/development.md before requesting review.
 
 Keep presentation separate from browser collection and use the shared report
 contract in `src/scanner/types.ts`. Avoid speculative services and dependencies.
