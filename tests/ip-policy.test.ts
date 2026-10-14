@@ -42,6 +42,14 @@ describe("isPublicAddress", () => {
     ["NAT64 embedding metadata", "64:ff9b::a9fe:a9fe"],
     ["6to4 embedding loopback", "2002:7f00:1::1"],
     ["Teredo", "2001:0:4136:e378:8000:63bf:3fff:fdd2"],
+    ["IPv4-compatible loopback", "::7f00:1"],
+    ["IPv4-compatible private", "::a00:1"],
+    ["IPv4-compatible metadata", "::a9fe:a9fe"],
+    ["IPv4-compatible dotted", "::1.2.3.4"],
+    ["IPv6 dummy prefix RFC 9780", "100:0:0:1::1"],
+    ["NAT64 with dotted tail", "64:ff9b::8.8.8.8"],
+    ["full-form mapped with dotted tail", "0:0:0:0:0:ffff:127.0.0.1"],
+    ["IPv4-compatible dotted loopback", "::127.0.0.1"],
   ])("refuses %s (%s)", (_name, address) => {
     expect(isPublicAddress(address)).toBe(false);
   });
@@ -56,6 +64,11 @@ describe("isPublicAddress", () => {
     "1.2.3",
   ])("refuses unparseable or zoned input %j", (value) => {
     expect(isPublicAddress(value)).toBe(false);
+  });
+
+  it("still judges the standard IPv4-mapped spelling by its embedded address", () => {
+    expect(isPublicAddress("::ffff:8.8.8.8")).toBe(true);
+    expect(isPublicAddress("::ffff:127.0.0.1")).toBe(false);
   });
 
   it("accepts bracketed IPv6 literals as URLs produce them", () => {

@@ -48,6 +48,10 @@ export interface ScanProvenance {
   egress: {
     allowedConnections: number;
     blockedConnections: number;
+    /** Connections turned away only because a resource limit was reached. */
+    limitRefusals: number;
+    /** True when more refusals happened than blockedDestinations lists. */
+    blockedDestinationsTruncated: boolean;
     /** Hostname and port only. */
     blockedDestinations: { host: string; port: number; reason: string }[];
   };

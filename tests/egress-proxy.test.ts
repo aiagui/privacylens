@@ -254,6 +254,95 @@ describe("egress proxy address policy", () => {
   });
 });
 
+describe("egress proxy hardening from the security audit", () => {
+  it.each([
+    "0177.0.0.1",
+    "2130706433",
+    "0x7f.1",
+    "127.1",
+    "1.2.3",
+    "0300.0250.0.1",
+    "1.2.3.4.",
+    "0x7f.0x0.0x0.0x1",
+  ])("refuses ambiguous numeric host %s before any lookup", async (host) => {
+    const lookups: string[] = [];
+    const p = await start({
+      resolve: async (name) => {
+        lookups.push(name);
+        return [{ address: "127.0.0.1", family: 4 }];
+      },
+    });
+    expect(status(await raw(p, connectRequest(p, `${host}:80`)))).toContain(
+      "403",
+    );
+    expect(lookups).toEqual([]);
+    expect(p.stats().blockedDestinations[0]?.reason).toBe("bad-request");
+  });
+
+  it("still resolves ordinary names that merely look hex-like", async () => {
+    const lookups: string[] = [];
+    const p = await start({
+      resolve: async (name) => {
+        lookups.push(name);
+        return [{ address: "10.0.0.1", family: 4 }];
+      },
+    });
+    await raw(p, connectRequest(p, "dead.beef:80"));
+    expect(lookups).toEqual(["dead.beef"]);
+  });
+
+  it("marks refusals with a per-run value that a destination cannot know", async () => {
+    const p = await start();
+    const first = await raw(
+      p,
+      `GET http://127.0.0.1:1/ HTTP/1.1\r\nHost: 127.0.0.1:1\r\nProxy-Authorization: ${auth(p)}\r\n\r\n`,
+    );
+    expect(first.toLowerCase()).toContain(
+      `x-privacylens-blocked: ${p.blockMarker}`,
+    );
+    expect(p.blockMarker).toMatch(/^[0-9a-f]{32}$/);
+    const other = await startEgressProxy();
+    expect(other.blockMarker).not.toBe(p.blockMarker);
+    await other.close();
+  });
+
+  it("strips a forged refusal marker from an upstream response", async () => {
+    const origin = createServer((_req, res) => {
+      res
+        .writeHead(200, {
+          "x-privacylens-blocked": "1",
+          "content-type": "text/plain",
+        })
+        .end("ok");
+    });
+    servers.push(origin);
+    await new Promise<void>((done) => origin.listen(0, "127.0.0.1", done));
+    const port = (origin.address() as { port: number }).port;
+    const p = await start({
+      policy: {
+        allowAddress: (a, port2) => a === "127.0.0.1" && port2 === port,
+      },
+      resolve: resolver({ "site.test": ["127.0.0.1"] }),
+    });
+    const answer = await raw(
+      p,
+      `GET http://site.test:${port}/ HTTP/1.1\r\nHost: site.test:${port}\r\nProxy-Authorization: ${auth(p)}\r\nConnection: close\r\n\r\n`,
+    );
+    expect(status(answer)).toContain("200");
+    expect(answer.toLowerCase()).not.toContain("x-privacylens-blocked");
+  });
+
+  it("flags when the blocked-destination list is truncated", async () => {
+    const p = await start();
+    for (let i = 0; i < 105; i += 1)
+      await raw(p, connectRequest(p, `10.0.0.${i % 250}:${1000 + i}`));
+    const stats = p.stats();
+    expect(stats.blockedConnections).toBe(105);
+    expect(stats.blockedDestinations).toHaveLength(100);
+    expect(stats.blockedDestinationsTruncated).toBe(true);
+  }, 30_000);
+});
+
 describe("egress proxy forwarding", () => {
   it("tunnels bytes for an address the policy allows", async () => {
     const echo = createTcpServer((socket: Socket) =>
@@ -333,9 +422,64 @@ describe("egress proxy forwarding", () => {
     }
     await new Promise((done) => setTimeout(done, 300));
     const answer = await raw(p, connectRequest(p, `slow.test:${port}`));
-    expect(status(answer)).toContain("403");
-    expect(p.stats().blockedDestinations.at(-1)?.reason).toBe("limit-exceeded");
+    // The fifth tunnel is turned away for capacity, which is not a policy
+    // refusal: it must not be recorded as a blocked destination.
+    expect(status(answer)).toContain("503");
+    expect(answer).toContain(`${p.blockMarker}:limit`);
+    const stats = p.stats();
+    expect(stats.limitRefusals).toBe(1);
+    expect(stats.blockedConnections).toBe(0);
+    expect(stats.blockedDestinations).toEqual([]);
+    expect(p.wasBlocked("slow.test", port)).toBe(false);
     for (const socket of held) socket.destroy();
+  });
+
+  it("counts tunnels, not sockets: a limit of N allows N tunnels", async () => {
+    const hold = createTcpServer(() => undefined);
+    servers.push(hold);
+    await new Promise<void>((done) => hold.listen(0, "127.0.0.1", done));
+    const port = (hold.address() as { port: number }).port;
+    const p = await start({
+      policy: { allowAddress: () => true },
+      resolve: resolver({ "slow.test": ["127.0.0.1"] }),
+      limits: { maxConnections: 6 },
+    });
+    const held: Socket[] = [];
+    let established = 0;
+    for (let i = 0; i < 8; i += 1) {
+      const socket = connect(p.port, "127.0.0.1");
+      held.push(socket);
+      const first = await new Promise<string>((done) => {
+        socket.once("data", (chunk) =>
+          done(chunk.toString().split("\r\n")[0] ?? ""),
+        );
+        socket.write(connectRequest(p, `slow.test:${port}`));
+        setTimeout(() => done("timeout"), 1500);
+      });
+      if (first.includes("200")) established += 1;
+    }
+    expect(established).toBe(6);
+    expect(p.stats().limitRefusals).toBe(2);
+    for (const socket of held) socket.destroy();
+  });
+
+  it("frees capacity when a tunnel closes", async () => {
+    const hold = createTcpServer(() => undefined);
+    servers.push(hold);
+    await new Promise<void>((done) => hold.listen(0, "127.0.0.1", done));
+    const port = (hold.address() as { port: number }).port;
+    const p = await start({
+      policy: { allowAddress: () => true },
+      resolve: resolver({ "slow.test": ["127.0.0.1"] }),
+      limits: { maxConnections: 1 },
+    });
+    const first = connect(p.port, "127.0.0.1");
+    first.write(connectRequest(p, `slow.test:${port}`));
+    await new Promise((done) => setTimeout(done, 300));
+    first.destroy();
+    await new Promise((done) => setTimeout(done, 300));
+    const answer = await raw(p, connectRequest(p, `slow.test:${port}`));
+    expect(status(answer)).toContain("200");
   });
 
   it("cuts connections once the total byte budget is exceeded", async () => {

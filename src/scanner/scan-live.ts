@@ -12,6 +12,17 @@ import { UnsafeTargetError } from "./url-policy.ts";
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
 export const DEFAULT_SETTLE_MS = 4_000;
+/**
+ * The browser must not resolve names or send UDP itself. The WebRTC policy is
+ * load-bearing: without it a page's RTCPeerConnection sends STUN datagrams
+ * around the proxy (tests/scan-live.test.ts proves it stays closed).
+ */
+export const BROWSER_ARGS = [
+  "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1",
+  "--disable-quic",
+  "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+];
+
 const MAX_RECORDED_REQUESTS = 500;
 const MAX_URL_LENGTH = 2048;
 
@@ -122,12 +133,7 @@ export async function scanLive(
         // through the filter so loopback is refused like any other private range.
         bypass: "<-loopback>",
       },
-      args: [
-        // Belt and braces: the browser must not resolve names or use UDP itself.
-        "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1",
-        "--disable-quic",
-        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-      ],
+      args: BROWSER_ARGS,
     });
     const context = await browser.newContext({
       acceptDownloads: false,
@@ -175,8 +181,14 @@ export async function scanLive(
         .then((response) => {
           if (!response) return;
           raw.status = response.status();
+          const marker = response.headers()[BLOCKED_HEADER];
+          // Only the proxy knows the per-run marker, so a site cannot forge it.
           raw.outcome =
-            BLOCKED_HEADER in response.headers() ? "blocked" : "completed";
+            marker === proxy.blockMarker
+              ? "blocked"
+              : marker === `${proxy.blockMarker}:limit`
+                ? "failed"
+                : "completed";
         })
         .catch(() => undefined);
     });
@@ -231,7 +243,8 @@ export async function scanLive(
         timeout: timeoutMs,
       });
       navigationStatus = response?.status();
-      navigationBlocked = !!response && BLOCKED_HEADER in response.headers();
+      navigationBlocked =
+        response?.headers()[BLOCKED_HEADER] === proxy.blockMarker;
     } catch (error) {
       refuseIfBlocked();
       // The cause is kept for debugging but never printed: it can quote full URLs.
@@ -331,6 +344,14 @@ export async function scanLive(
       limitations.push(
         `${egress.blockedConnections} connection attempt(s) were refused by the egress filter.`,
       );
+    if (egress.limitRefusals > 0)
+      limitations.push(
+        `${egress.limitRefusals} connection(s) were turned away only because the scanner's connection limit was reached; those requests are recorded as failed, not refused for safety.`,
+      );
+    if (egress.blockedDestinationsTruncated)
+      limitations.push(
+        `More connections were refused than the ${egress.blockedDestinations.length} destinations listed in the provenance.`,
+      );
     if (dropped > 0)
       limitations.push(
         `${dropped} request(s) beyond the ${MAX_RECORDED_REQUESTS}-request recording cap are not listed.`,
@@ -372,6 +393,8 @@ export async function scanLive(
         egress: {
           allowedConnections: egress.allowedConnections,
           blockedConnections: egress.blockedConnections,
+          limitRefusals: egress.limitRefusals,
+          blockedDestinationsTruncated: egress.blockedDestinationsTruncated,
           blockedDestinations: egress.blockedDestinations,
         },
       },

@@ -1,6 +1,13 @@
+import { createSocket, type Socket as UdpSocket } from "node:dgram";
 import { createServer, type Server } from "node:http";
+import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { scanLive, parseTargetUrl, redactUrls } from "../src/scanner/scan-live";
+import {
+  BROWSER_ARGS,
+  scanLive,
+  parseTargetUrl,
+  redactUrls,
+} from "../src/scanner/scan-live";
 import { UnsafeTargetError } from "../src/scanner/url-policy";
 import type { EgressOptions } from "../src/scanner/egress-proxy";
 
@@ -122,6 +129,33 @@ beforeAll(async () => {
         page(
           `<script>fetch("http://stats.example:${publicPort}/nocors/matomo.php").catch(() => {});</script>`,
         ),
+      );
+    } else if (path === "/spoof") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(
+          `<script>fetch("http://stats.example:${publicPort}/spoof/matomo.php", { mode: "no-cors" }).catch(() => {});</script>`,
+        ),
+      );
+    } else if (path === "/spoof/matomo.php") {
+      // A destination pretending the scanner's filter refused it.
+      res.writeHead(204, { "x-privacylens-blocked": "1" }).end();
+    } else if (path === "/spoofed-document") {
+      res.writeHead(200, {
+        "content-type": "text/html",
+        "x-privacylens-blocked": "1",
+      });
+      res.end(page("<p>hello</p>"));
+    } else if (path === "/webrtc") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(`<script>
+          (async () => {
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:" + new URLSearchParams(location.search).get("udp") }] });
+            pc.createDataChannel("x");
+            await pc.setLocalDescription(await pc.createOffer());
+          })().catch(() => {});
+        </script>`),
       );
     } else if (path === "/missing") {
       res.writeHead(404).end("nope");
@@ -299,6 +333,38 @@ describe("scanLive evidence", () => {
     expect(evidence).toMatch(/may still have reached the server/);
   }, 30_000);
 
+  it("cannot be made to hide a request by forging the refusal header", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/spoof`,
+      options(),
+    );
+    const matomo = report.technologies.find((t) => t.name === "Matomo");
+    expect(matomo).toMatchObject({ observation: "observed" });
+    expect(matomo?.evidence.join(" ")).toMatch(
+      /Outcome: completed \(HTTP 204\)/,
+    );
+    expect(report.concerns.map((c) => c.title)).toContain(
+      "Tracking before interaction",
+    );
+    expect(report.provenance?.egress.blockedConnections).toBe(0);
+    const request = report.thirdPartyRequests.find(
+      (r) => r.domain === "stats.example",
+    );
+    expect(request).toMatchObject({
+      outcome: "completed",
+      classification: "observed",
+    });
+  }, 30_000);
+
+  it("is not fooled when the scanned document itself forges the header", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/spoofed-document`,
+      options(),
+    );
+    expect(report.status).toBe("completed");
+    expect(report.provenance?.egress.blockedConnections).toBe(0);
+  }, 30_000);
+
   it("does not produce a report for a non-success page", async () => {
     await expect(
       scanLive(`http://site.example:${publicPort}/missing`, options()),
@@ -334,4 +400,67 @@ describe("target parsing and error redaction", () => {
       "some-uuid",
     );
   });
+});
+
+describe("WebRTC stays closed", () => {
+  let sensor: UdpSocket;
+  let datagrams = 0;
+  let udpPort = 0;
+  let controlSawTraffic = false;
+
+  beforeAll(async () => {
+    sensor = createSocket("udp4");
+    sensor.on("message", () => {
+      datagrams += 1;
+    });
+    await new Promise<void>((done) => sensor.bind(0, "127.0.0.1", done));
+    udpPort = sensor.address().port;
+
+    // Positive control: with no proxy and no WebRTC flag, Chromium DOES send
+    // STUN here. If it does not (some CI sandboxes), the behavioral test below
+    // would prove nothing, so it is skipped explicitly.
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const control = await browser.newPage();
+      await control.goto(
+        `http://127.0.0.1:${publicPort}/webrtc?udp=${udpPort}`,
+      );
+      await control.waitForTimeout(2500);
+    } finally {
+      await browser.close();
+    }
+    controlSawTraffic = datagrams > 0;
+    datagrams = 0;
+  }, 30_000);
+
+  afterAll(() => {
+    sensor.close();
+  });
+
+  it("keeps the WebRTC policy flag in the browser arguments", () => {
+    expect(BROWSER_ARGS).toContain(
+      "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+    );
+    expect(BROWSER_ARGS).toContain("--disable-quic");
+    expect(
+      BROWSER_ARGS.some((arg) =>
+        arg.startsWith("--host-resolver-rules=MAP * ~NOTFOUND"),
+      ),
+    ).toBe(true);
+  });
+
+  it("sends no UDP datagrams around the proxy", async (context) => {
+    if (!controlSawTraffic) {
+      console.warn(
+        "WebRTC control produced no STUN traffic in this environment; behavioral check skipped",
+      );
+      context.skip();
+      return;
+    }
+    await scanLive(`http://site.example:${publicPort}/webrtc?udp=${udpPort}`, {
+      ...options(),
+      settleMs: 2500,
+    });
+    expect(datagrams).toBe(0);
+  }, 40_000);
 });

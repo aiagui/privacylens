@@ -22,8 +22,8 @@ export interface EgressLimits {
   idleTimeoutMs: number;
 }
 
-export type BlockReason =
-  "non-public-address" | "unresolvable" | "bad-request" | "limit-exceeded";
+/** Policy refusals. Resource limits are reported separately, never as these. */
+export type BlockReason = "non-public-address" | "unresolvable" | "bad-request";
 
 export interface BlockedDestination {
   host: string;
@@ -63,6 +63,20 @@ const HOP_BY_HOP = [
   "upgrade",
 ];
 
+/**
+ * Host spellings that look numeric but are not strict dotted-quad IPv4
+ * ("0177.0.0.1", "2130706433", "0x7f.1", "127.1"). The system resolver reads
+ * some of these as a different address than the browser does, so they are
+ * refused before any lookup.
+ */
+function isAmbiguousNumericHost(host: string): boolean {
+  const numeric = /^(?:0x[0-9a-f]*|[0-9]+)(?:\.(?:0x[0-9a-f]*|[0-9]+))*\.?$/i;
+  if (!numeric.test(host)) return false;
+  return !/^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(
+    host,
+  );
+}
+
 function keyOf(host: string, port: number): string {
   return `${host.replace(/^\[|\]$/g, "").toLowerCase()}:${port}`;
 }
@@ -89,10 +103,16 @@ export interface EgressProxy {
   /** Credentials the browser must present; others cannot use the proxy. */
   readonly credentials: { username: string; password: string };
   readonly port: number;
+  /** Random per-run value that marks the proxy's own refusal responses. */
+  readonly blockMarker: string;
   stats(): {
     allowedConnections: number;
     blockedConnections: number;
     blockedDestinations: BlockedDestination[];
+    /** True when more refusals happened than the list holds. */
+    blockedDestinationsTruncated: boolean;
+    /** Requests turned away only because a resource limit was reached. */
+    limitRefusals: number;
     totalBytes: number;
   };
   wasBlocked(host: string, port: number): boolean;
@@ -130,6 +150,9 @@ export async function startEgressProxy(
   const sockets = new Set<Socket>();
   const blocked: BlockedDestination[] = [];
   const blockedKeys = new Map<string, BlockReason>();
+  const blockMarker = randomBytes(16).toString("hex");
+  let activeTunnels = 0;
+  let limitRefusals = 0;
   let allowed = 0;
   let blockedCount = 0;
   let totalBytes = 0;
@@ -159,8 +182,7 @@ export async function startEgressProxy(
     host: string,
     port: number,
   ): Promise<{ socket: Socket } | { reason: BlockReason }> {
-    if (sockets.size >= limits.maxConnections)
-      return { reason: "limit-exceeded" };
+    if (isAmbiguousNumericHost(host)) return { reason: "bad-request" };
     let addresses: ResolvedAddress[];
     try {
       addresses = await resolve(host);
@@ -215,7 +237,7 @@ export async function startEgressProxy(
       ) => {
         if (reason) recordBlock(host, port, reason);
         client.end(
-          `HTTP/1.1 ${status}\r\n${BLOCKED_HEADER}: 1\r\nConnection: close\r\n\r\n`,
+          `HTTP/1.1 ${status}\r\n${BLOCKED_HEADER}: ${blockMarker}\r\nConnection: close\r\n\r\n`,
         );
       };
       if (!authorized(req.headers["proxy-authorization"])) {
@@ -226,9 +248,27 @@ export async function startEgressProxy(
       }
       const target = parseAuthority(req.url ?? "");
       if (!target) return deny("400 Bad Request", "", 0, "bad-request");
+      if (activeTunnels >= limits.maxConnections) {
+        limitRefusals += 1;
+        client.end(
+          `HTTP/1.1 503 Service Unavailable\r\n${BLOCKED_HEADER}: ${blockMarker}:limit\r\nConnection: close\r\n\r\n`,
+        );
+        return;
+      }
+      activeTunnels += 1;
+      let released = false;
+      const release = () => {
+        if (!released) {
+          released = true;
+          activeTunnels -= 1;
+        }
+      };
+      client.on("close", release);
       const result = await open(target.host, target.port);
-      if ("reason" in result)
+      if ("reason" in result) {
+        release();
         return deny("403 Forbidden", target.host, target.port, result.reason);
+      }
       allowed += 1;
       const upstream = result.socket;
       track(upstream);
@@ -245,7 +285,9 @@ export async function startEgressProxy(
   server.on("request", async (req: IncomingMessage, res: ServerResponse) => {
     const fail = (code: number, host = "", port = 0, reason?: BlockReason) => {
       if (reason) recordBlock(host, port, reason);
-      res.writeHead(code, { Connection: "close", [BLOCKED_HEADER]: "1" }).end();
+      res
+        .writeHead(code, { Connection: "close", [BLOCKED_HEADER]: blockMarker })
+        .end();
     };
     if (!authorized(req.headers["proxy-authorization"])) {
       res
@@ -263,9 +305,30 @@ export async function startEgressProxy(
       return fail(400, "", 0, "bad-request");
     const authority = parseAuthority(url.host, 80);
     if (!authority) return fail(400, "", 0, "bad-request");
+    if (activeTunnels >= limits.maxConnections) {
+      limitRefusals += 1;
+      res
+        .writeHead(503, {
+          Connection: "close",
+          [BLOCKED_HEADER]: `${blockMarker}:limit`,
+        })
+        .end();
+      return;
+    }
+    activeTunnels += 1;
+    let released = false;
+    const release = () => {
+      if (!released) {
+        released = true;
+        activeTunnels -= 1;
+      }
+    };
+    res.on("close", release);
     const result = await open(authority.host, authority.port);
-    if ("reason" in result)
+    if ("reason" in result) {
+      release();
       return fail(403, authority.host, authority.port, result.reason);
+    }
     const socket = result.socket;
     track(socket);
     allowed += 1;
@@ -280,6 +343,9 @@ export async function startEgressProxy(
     upstream.on("response", (response) => {
       const out = { ...response.headers };
       for (const name of HOP_BY_HOP) delete out[name];
+      // Only this proxy may say "refused": a destination must not be able to
+      // forge the marker and make its own request look blocked.
+      delete out[BLOCKED_HEADER];
       res.writeHead(response.statusCode ?? 502, out);
       response.pipe(res);
     });
@@ -301,10 +367,13 @@ export async function startEgressProxy(
   return {
     credentials,
     port: address.port,
+    blockMarker,
     stats: () => ({
       allowedConnections: allowed,
       blockedConnections: blockedCount,
       blockedDestinations: [...blocked],
+      blockedDestinationsTruncated: blockedCount > blocked.length,
+      limitRefusals,
       totalBytes,
     }),
     wasBlocked: (host, port) => blockedKeys.has(keyOf(host, port)),
