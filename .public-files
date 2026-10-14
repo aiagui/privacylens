@@ -21,6 +21,7 @@ docs/assets/import-report-desktop.png
 docs/assets/import-report-mobile.png
 docs/assets/report-desktop.png
 docs/assets/report-mobile.png
+docs/assets/report-technical-desktop.png
 docs/ci-and-releases.md
 docs/development.md
 docs/product-direction.md
@@ -55,11 +56,14 @@ src/cli/privacylens.ts
 src/components/evidence.tsx
 src/components/optical-field.tsx
 src/components/report-import.tsx
+src/components/report-tabs.tsx
 src/components/report-view.tsx
 src/components/request-journey.tsx
+src/components/simple-view.tsx
 src/components/site-chrome.tsx
 src/proxy.ts
 src/report/import.ts
+src/report/summary.ts
 src/report/text.ts
 src/report/validate.ts
 src/sample-report.ts
@@ -91,6 +95,7 @@ tests/report-format-doc.test.ts
 tests/report-import.test.ts
 tests/report-validate.test.ts
 tests/report-view-safety.test.tsx
+tests/report-views.test.tsx
 tests/sample-report.test.ts
 tests/sandbox.test.ts
 tests/scan-fixture.test.ts

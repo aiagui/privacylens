@@ -1649,3 +1649,164 @@ tbody tr:last-child > * {
 .list-title-row > .evidence-label {
   flex: none;
 }
+
+/* Report Experience 2.0: quieter hero, Simple and Technical views. */
+.report-focus {
+  grid-template-columns: 1.7fr 1fr;
+  gap: 40px;
+  padding: 28px 36px;
+}
+.report-focus h1 {
+  margin: 14px 0 10px;
+  font-size: clamp(28px, 3vw, 40px);
+}
+.report-optics {
+  opacity: 0.55;
+}
+.report-optics .optical-field svg {
+  height: 110px;
+}
+.report-optics .field-axis {
+  display: none;
+}
+.report-views {
+  margin-top: 8px;
+}
+.view-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+}
+.view-tabs button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 10px 18px 12px;
+  margin-bottom: -1px;
+  min-height: 44px;
+  font-weight: 700;
+}
+.view-tabs button small {
+  font-weight: 500;
+  font-size: 12px;
+}
+.view-tabs button[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--electric);
+}
+.view-switch {
+  margin: 8px 0 0;
+}
+.view-switch button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 16px;
+  min-height: 44px;
+  color: var(--ink);
+  font-weight: 700;
+}
+.simple-headline {
+  font-size: clamp(20px, 2.4vw, 28px);
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  max-width: 52ch;
+  margin: 0 0 24px;
+}
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff70;
+}
+.stat-row li {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 22px;
+  border-left: 1px solid var(--line);
+}
+.stat-row li:first-child {
+  border-left: 0;
+}
+.stat-row strong {
+  font-size: 32px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.stat-row span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.simple-view .report-panel-wide,
+.simple-view .report-grid {
+  margin-top: 20px;
+}
+.simple-subhead {
+  font-size: 14px;
+  margin: 18px 0 8px;
+}
+.table-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+.limits-panel {
+  background: #ffffff50;
+}
+@media (max-width: 1000px) {
+  .report-focus {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 24px;
+  }
+  .report-optics .optical-field svg {
+    height: 80px;
+  }
+}
+@media (max-width: 700px) {
+  .stat-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stat-row li:nth-child(odd) {
+    border-left: 0;
+  }
+  .stat-row li:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+  .view-tabs {
+    gap: 0;
+  }
+  .view-tabs button {
+    flex: 1;
+    padding-inline: 10px;
+  }
+  .view-tabs button small {
+    display: none;
+  }
+}
+/* A fixed element repeats on every printed page; the skip link is for
+   keyboard navigation only. */
+@media print {
+  .skip-link,
+  .view-tabs,
+  .view-switch,
+  .field-caption button {
+    display: none !important;
+  }
+  .report-optics {
+    display: none;
+  }
+}

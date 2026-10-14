@@ -61,6 +61,29 @@ try {
   await page.getByRole("heading", { name: "What we observed" }).waitFor();
   assert.match(await page.getByRole("note").innerText(), /Sample data/);
   assert.match(await page.locator("main").innerText(), /sample-shop.example/);
+  // Simple View is the default and leads with a plain-language summary.
+  assert.equal(
+    await page
+      .getByRole("tab", { name: /Simple view/ })
+      .getAttribute("aria-selected"),
+    "true",
+  );
+  const simpleText = await page.locator("#panel-simple").innerText();
+  assert.match(simpleText, /third-party request/);
+  assert.match(simpleText, /Purpose not established/);
+  assert.match(simpleText, /not a legal or GDPR compliance assessment/);
+  assert.equal(await page.locator("#panel-technical").isVisible(), false);
+  // Keyboard: arrow keys move between views.
+  await page.getByRole("tab", { name: /Simple view/ }).focus();
+  await page.keyboard.press("ArrowRight");
+  assert.equal(
+    await page
+      .getByRole("tab", { name: /Technical view/ })
+      .getAttribute("aria-selected"),
+    "true",
+  );
+  assert.equal(await page.locator("#panel-simple").isVisible(), false);
+  assert.equal(await page.locator("#panel-technical").isVisible(), true);
   await page.getByRole("button", { name: /Google Analytics/ }).click();
   assert.match(
     await page.locator(".journey-detail").innerText(),
@@ -132,6 +155,15 @@ try {
     await page.getByRole("button", { name: "Pause motion" }).isVisible(),
     false,
   );
+  // The skip link is fixed-position; it must not repeat on printed pages.
+  await page.emulateMedia({ media: "print" });
+  assert.equal(
+    await page
+      .locator(".skip-link")
+      .evaluate((node) => globalThis.getComputedStyle(node).display),
+    "none",
+  );
+  await page.emulateMedia({ media: "screen", reducedMotion: "reduce" });
   const screenshotDir = process.env.PRIVACYLENS_SCREENSHOT_DIR;
   if (screenshotDir) await mkdir(screenshotDir, { recursive: true });
   for (const [name, width, height] of [
@@ -156,6 +188,12 @@ try {
         "Page must fit viewport",
       );
       if (view === "report") {
+        if (screenshotDir && name !== "narrow")
+          await page.screenshot({
+            path: join(screenshotDir, "report-" + name + ".png"),
+            fullPage: true,
+          });
+        await page.getByRole("tab", { name: /Technical view/ }).click();
         assert.equal(
           await page
             .getByRole("region", { name: "Cookie attributes" })
@@ -173,9 +211,14 @@ try {
           /Example timestamp.*UTC/,
         );
       }
-      if (screenshotDir && name !== "narrow")
+      if (screenshotDir && name !== "narrow" && view === "home")
         await page.screenshot({
           path: join(screenshotDir, view + "-" + name + ".png"),
+          fullPage: true,
+        });
+      if (screenshotDir && name !== "narrow" && view === "report")
+        await page.screenshot({
+          path: join(screenshotDir, "report-technical-" + name + ".png"),
           fullPage: true,
         });
     }

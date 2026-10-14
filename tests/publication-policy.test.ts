@@ -63,6 +63,7 @@ describe("publication policy", () => {
       "docs/assets/import-report-mobile.png",
       "docs/assets/report-desktop.png",
       "docs/assets/report-mobile.png",
+      "docs/assets/report-technical-desktop.png",
       "public/icon.svg",
       "public/social-preview.png",
       "public/fonts/manrope-latin.ttf",

@@ -15,7 +15,13 @@ needed at runtime.
 
 ## Accessibility
 
-Navigation includes a skip link and visible keyboard focus. The optical field
+Navigation includes a skip link and visible keyboard focus. The skip link is
+hidden in print, because a fixed element repeats on every printed page (this
+was the repeated "Skip to content" in PDF exports). Reports open in a Simple
+view and can switch to a Technical view with a tab control that supports the
+arrow, Home and End keys; both views are built from the same summary, so their
+counts cannot disagree. The optical field is deliberately low-contrast and
+secondary to the findings. The optical field
 has a pause control and remains still when reduced motion is preferred. Tables
 have captions, scoped headers, named keyboard-focusable scroll regions and
 mobile guidance. Reports use a single page heading followed by section headings.
