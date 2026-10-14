@@ -1,10 +1,10 @@
-import type { TechnologyFinding } from "./types";
+import type { TechnologyFinding } from "./types.ts";
 
 /**
  * Bump whenever any signature below changes. tests/signatures.test.ts pins a
  * content hash so an edit without a version bump fails CI.
  */
-export const SIGNATURE_SET_VERSION = "2026-10-14.2";
+export const SIGNATURE_SET_VERSION = "2026-10-14.3";
 
 export interface SignatureSource {
   url: string;
@@ -29,6 +29,11 @@ export interface Signature {
    * Without it a signature can never produce `observed`, only `inferred`.
    */
   collection?: RegExp;
+  /**
+   * Also required, in the query string, for `observed`. Used where a file name
+   * alone is not distinctive. The query is matched in memory and never stored.
+   */
+  collectionQuery?: RegExp;
   /** True only if a fetched vendor source supports the `collection` pattern. */
   collectionSourced: boolean;
   /** Human-readable identification criteria; what a match does and does not show. */
@@ -161,12 +166,12 @@ export const signatures: Signature[] = [
     id: "tiktok-pixel",
     name: "TikTok Pixel",
     category: "advertising",
-    domains: ["tiktok.com"],
+    domains: ["analytics.tiktok.com", "business-api.tiktok.com"],
     path: /(?:^|\/)pixel(?:\/|$)/i,
     collection: /^(?!.*\.js$).*(?:^|\/)pixel(?:\/|$)/i,
     collectionSourced: false,
     criteria:
-      "A tiktok.com request whose path contains a pixel segment. Ordinary tiktok.com pages and tiktokcdn.com content are not attributed.",
+      "A request to a TikTok analytics or business-API host whose path contains a pixel segment. Ordinary tiktok.com pages (such as /discover/pixel) and tiktokcdn.com content are not attributed.",
     sources: [],
     unverified: ["pixel path shapes (TikTok page fetched did not state them)"],
     examples: {
@@ -175,6 +180,7 @@ export const signatures: Signature[] = [
       negative: [
         "https://www.tiktok.com/@someone/video/1",
         "https://www.tiktok.com/events/foo",
+        "https://www.tiktok.com/discover/pixel",
       ],
     },
   },
@@ -252,10 +258,11 @@ export const signatures: Signature[] = [
     category: "analytics",
     domains: [],
     path: /(?:^|\/)(?:matomo|piwik)\.(?:js|php)\/?$/i,
+    collectionQuery: /(?:^|&)idsite=/i,
     collection: /(?:^|\/)(?:matomo|piwik)\.php\/?$/i,
     collectionSourced: true,
     criteria:
-      "Any host serving matomo/piwik .js or .php at the end of the path. File names can be reused by unrelated software.",
+      "Any host serving matomo/piwik .js or .php at the end of the path is attributed (inferred). It is observed only when the request also carries an idsite parameter, because a file name alone can be reused by unrelated software.",
     sources: [
       {
         url: "https://developer.matomo.org/api-reference/tracking-api",
@@ -266,7 +273,10 @@ export const signatures: Signature[] = [
     unverified: ["matomo.js and piwik.* legacy names"],
     examples: {
       observed: ["https://stats.example.org/matomo.php?idsite=1"],
-      inferred: ["https://stats.example.org/piwik.js"],
+      inferred: [
+        "https://stats.example.org/piwik.js",
+        "https://stats.example.org/matomo.php",
+      ],
       negative: ["https://stats.example.org/matomo-guide"],
     },
   },

@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
-import { scanFixture } from "./scan-fixture";
-import type { ScanReport } from "./types";
+import { scanFixture } from "./scan-fixture.ts";
+import type { ScanReport } from "./types.ts";
 
 export class UnknownFixtureError extends Error {
   constructor(fixtureId: string) {

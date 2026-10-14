@@ -1,19 +1,11 @@
 import { lookup } from "node:dns/promises";
 import ipaddr from "ipaddr.js";
+import { isPublicAddress } from "./ip-policy.ts";
 
 export class UnsafeTargetError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "UnsafeTargetError";
-  }
-}
-
-function isPublicAddress(value: string): boolean {
-  try {
-    const parsed = ipaddr.process(value);
-    return parsed.range() === "unicast";
-  } catch {
-    return false;
   }
 }
 

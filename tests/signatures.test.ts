@@ -17,8 +17,8 @@ describe("signature governance", () => {
     // If this fails you changed a signature. Bump SIGNATURE_SET_VERSION in
     // src/scanner/signatures.ts, then update both values here.
     expect({ version: SIGNATURE_SET_VERSION, hash: contentHash() }).toEqual({
-      version: "2026-10-14.2",
-      hash: "b4d7df4f38f8ff87717492139f7666010be9a7a059cefeaf1dfc00c8cc1db7f8",
+      version: "2026-10-14.3",
+      hash: "fca5c78ebd7d18e2d6042b790c82c2d52561a643bd6691257ca15ad2dad72b35",
     });
   });
 

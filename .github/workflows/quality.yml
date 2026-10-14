@@ -45,3 +45,45 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: "false"
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+  sandbox:
+    name: Chromium sandbox tests
+    # Pinned: the AppArmor profile syntax below targets Ubuntu 24.04. ubuntu-latest
+    # moves to 26.04 in November 2026, and 22.04 images are being retired.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Turns "the sandbox cannot start" into a failure instead of a skipped test.
+      PRIVACYLENS_REQUIRE_SANDBOX: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Ubuntu 24.04 blocks unprivileged user namespaces, which Chromium's process
+      # sandbox needs. Rather than lowering that host-wide setting, grant the
+      # permission to Playwright's Chromium binaries only, with an AppArmor profile
+      # (the mechanism Canonical documents for exactly this). This job only runs
+      # the sandbox-dependent tests, the token is read-only, and no secrets exist.
+      - name: Allow user namespaces for Playwright's Chromium only
+        run: |
+          set -euo pipefail
+          sudo tee /etc/apparmor.d/privacylens-playwright-chromium >/dev/null <<PROFILE
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile privacylens-playwright-chromium $HOME/.cache/ms-playwright/**/{chrome,chrome-headless-shell} flags=(unconfined) {
+            userns,
+          }
+          PROFILE
+          sudo apparmor_parser -r /etc/apparmor.d/privacylens-playwright-chromium
+      - name: Confirm the host-wide restriction is unchanged
+        run: |
+          value="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)"
+          echo "kernel.apparmor_restrict_unprivileged_userns = $value"
+          test "$value" = "1"
+      - run: npm run test:sandbox

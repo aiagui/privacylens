@@ -1,23 +1,12 @@
 import { chromium } from "playwright";
-import { assessRequest, isThirdParty, safeDestination } from "./detectors";
-import { SIGNATURE_SET_VERSION } from "./signatures";
-import type { RequestFinding, ScanReport, TechnologyFinding } from "./types";
-import { UnsafeTargetError, validateFixtureUrl } from "./url-policy";
+import { assessRequest, isThirdParty, safeDestination } from "./detectors.ts";
+import { detectConsentManager, toCookieFindings } from "./collector-common.ts";
+import { SIGNATURE_SET_VERSION } from "./signatures.ts";
+import type { RequestFinding, ScanReport, TechnologyFinding } from "./types.ts";
+import { UnsafeTargetError, validateFixtureUrl } from "./url-policy.ts";
 
 const MAX_REQUESTS = 300;
 const SCAN_TIMEOUT_MS = 12_000;
-
-function sanitizeCookieName(name: string): string {
-  if (
-    name.length > 128 ||
-    name.includes("@") ||
-    [...name].some((character) => character.charCodeAt(0) < 32) ||
-    /(?:bearer|token|secret|password|api[_-]?key)/i.test(name)
-  ) {
-    return "[REDACTED]";
-  }
-  return name;
-}
 
 /**
  * Runs only against a caller-owned local fixture origin. Every other browser
@@ -139,31 +128,8 @@ export async function scanFixture(
     }
     await page.waitForTimeout(500);
 
-    const cmp = await page.evaluate(() => {
-      const named: [string, string][] = [
-        ["OneTrust", "#onetrust-banner-sdk"],
-        ["Cookiebot", "#CybotCookiebotDialog"],
-        ["Didomi", "#didomi-host"],
-        ["Usercentrics", "#usercentrics-root"],
-      ];
-      for (const [name, selector] of named) {
-        if (document.querySelector(selector))
-          return { detected: true, name, evidence: selector };
-      }
-      return { detected: false };
-    });
-
-    const cookies = (await context.cookies()).map((cookie) => ({
-      name: sanitizeCookieName(cookie.name),
-      domain: cookie.domain,
-      firstParty: !isThirdParty(url.hostname, cookie.domain.replace(/^\./, "")),
-      ...(cookie.expires > 0
-        ? { expires: new Date(cookie.expires * 1000).toISOString() }
-        : {}),
-      secure: cookie.secure,
-      httpOnly: cookie.httpOnly,
-      sameSite: cookie.sameSite,
-    }));
+    const cmp = await detectConsentManager(page);
+    const cookies = toCookieFindings(await context.cookies(), url.hostname);
 
     return {
       targetUrl: url.origin,

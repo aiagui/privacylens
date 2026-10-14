@@ -13,6 +13,9 @@ release date.
 - Observed, inferred and unknown classifications with signature id, set version
   and a reason, shown in the report interface.
 - Reports without cookie values, paths, query strings, headers or payloads.
+- Local CLI scanner (`npm run scan -- <url>`): live scans of a user-chosen site in
+  headless Chromium behind a local egress filter, with provenance and adversarial
+  tests. Unreleased; see the v0.1.0 section for what remains.
 - Quality gates, CodeQL, Gitleaks, Dependabot (ignore rules for major `@types/node`
   and TypeScript updates verified in a real run) and manually initiated source
   releases. No release has been made.
@@ -20,21 +23,20 @@ release date.
 ## v0.1.0: local CLI scanner
 
 Real-world website analysis on the user's own machine, with evidence-based JSON
-reports.
+reports. The scanner, egress filter, provenance and tests exist on `main`; the
+release itself has not been made.
 
-- Scan a user-chosen `http(s)` URL with Chromium and the existing signatures.
-- All browser traffic passes through one local egress filter that resolves names
-  itself and refuses private, loopback, link-local and metadata addresses, so
-  redirects, DNS rebinding and page-initiated requests to the user's own network
-  are blocked by default.
-- JSON report with provenance (scanner, signature-set and browser versions,
-  budgets, blocked-request counts) that follows the existing privacy rules.
-- Automated adversarial tests, run against real Chromium, for the egress filter.
-- Public web API stays disabled.
+Remaining before a v0.1.0 release (maintainer to confirm scope):
 
-Limits to state plainly: it runs on the user's machine, so it is a convenience
-safeguard for people scanning sites they choose, not the infrastructure isolation
-that hosted scanning requires. Initial page load only; no consent interaction.
+- Dedicated tests for WebRTC and QUIC being disabled, and a check on Windows and
+  behind a corporate proxy.
+- Source the unverified signature claims that most affect reports.
+- Human security review of the egress filter.
+- Release notes that state the limits plainly: it runs on the user's machine, so it
+  is a convenience safeguard, not the infrastructure isolation hosted scanning
+  needs; initial page load only; no consent interaction.
+
+The public web API stays disabled.
 
 ## v0.2.0: web report integration
 
