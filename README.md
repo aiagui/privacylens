@@ -27,7 +27,7 @@ into something people can explore, understand and question.
 ## Explore PrivacyLens
 
 The current web experience pairs an introduction to privacy inspection with a
-detailed, evidence-led report with an animated optical header and interactive
+detailed, evidence-led report with a Simple and a Technical view, a quiet optical header and interactive
 request timing view. These are real screenshots of the application
 running locally, using synthetic example data.
 
@@ -39,9 +39,11 @@ manager signals from the initial page load. Each finding is labeled observed,
 inferred or unknown.
 
 <details>
-<summary>Explore the full report: optical header, interactive request window and detailed evidence</summary>
+<summary>Explore the report: a Simple view for the main findings and a Technical view for the evidence</summary>
 
-![The sample report with its optical header, interactive request timings, evidence labels, cookies and network inventory.](docs/assets/report-desktop.png)
+![The sample report's Simple view: a plain-English summary, detected technologies, cookies, where the page connected and what the report cannot tell you.](docs/assets/report-desktop.png)
+
+![The same report's Technical view: request timings, evidence labels, signature versions, cookie attributes and the full network inventory.](docs/assets/report-technical-desktop.png)
 
 </details>
 

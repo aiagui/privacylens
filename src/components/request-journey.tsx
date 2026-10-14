@@ -157,6 +157,14 @@ export function RequestJourney({
           <strong>{current.technology ?? "Unidentified technology"}</strong>
         </div>
         <div>
+          <span className="section-kicker">DESTINATION</span>
+          <strong>{current.domain || "Unknown"}</strong>
+        </div>
+        <div>
+          <span className="section-kicker">ADDRESS</span>
+          <strong>{current.url}</strong>
+        </div>
+        <div>
           <span className="section-kicker">RESOURCE TYPE</span>
           <strong>{current.resourceType || "Unknown"}</strong>
         </div>

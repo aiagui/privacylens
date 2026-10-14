@@ -17,7 +17,4 @@ export function EvidenceLabel({ kind }: { kind: Classification }) {
   );
 }
 
-/** Reports from before signatures existed carry no classification. */
-export function classificationOf(value?: Classification): Classification {
-  return value ?? "unknown";
-}
+export { classificationOf } from "@/report/summary";

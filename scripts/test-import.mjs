@@ -197,7 +197,9 @@ try {
   const openFile = async (path) => {
     await page.locator("#report-file").setInputFiles(path);
   };
-  const reportMain = () => page.locator("main").innerText();
+  // textContent, so both views count: the inactive one is hidden, not removed.
+  const reportMain = () => page.locator("main").textContent();
+  const showView = (name) => page.getByRole("tab", { name }).click();
 
   // The home page links to the importer.
   await page.goto(origin);
@@ -305,6 +307,7 @@ try {
     1,
   );
   // The interactive request journey works on imported data.
+  await showView(/Technical view/);
   const destinations = page.locator(".destination-list button");
   assert.ok((await destinations.count()) >= 2);
   await destinations.nth(1).click();
@@ -597,14 +600,17 @@ try {
     [320, 720],
   ]) {
     await page.setViewportSize({ width: w, height: h });
-    const overflow = await page.evaluate(() => ({
-      scroll: globalThis.document.documentElement.scrollWidth,
-      inner: globalThis.innerWidth,
-    }));
-    assert.ok(
-      overflow.scroll <= overflow.inner,
-      `long strings must not overflow at ${w}px: ${overflow.scroll} > ${overflow.inner}`,
-    );
+    for (const view of [/Simple view/, /Technical view/]) {
+      await showView(view);
+      const overflow = await page.evaluate(() => ({
+        scroll: globalThis.document.documentElement.scrollWidth,
+        inner: globalThis.innerWidth,
+      }));
+      assert.ok(
+        overflow.scroll <= overflow.inner,
+        `long strings must not overflow at ${w}px: ${overflow.scroll} > ${overflow.inner}`,
+      );
+    }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: /Close this report/ }).click();
@@ -627,6 +633,7 @@ try {
     (await page.locator(".destination-list button").count()) <= 100,
     "the timeline is bounded",
   );
+  await showView(/Technical view/);
   assert.match(await page.locator(".journey-panel").innerText(), /first 100/);
   const closeStart = Date.now();
   await page.getByRole("button", { name: /Close this report/ }).click();

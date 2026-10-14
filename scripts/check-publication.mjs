@@ -20,11 +20,15 @@ const reviewedAssets = new Map([
   ],
   [
     "docs/assets/report-desktop.png",
-    "f0859d78e1ebfe406e69efa665b3c82307f791c6043e5d9d6a06aae5615fea04",
+    "da1478f35f2868ffcc4f2456c97f491c0c9d57151769bc921a1fec1b51c2fe98",
+  ],
+  [
+    "docs/assets/report-technical-desktop.png",
+    "2fca1726ddcef9984f0ea9bab50bdcf7c9bae55d6de68531914af19b854b72f7",
   ],
   [
     "docs/assets/report-mobile.png",
-    "8fa965ed9f38380be4cfcc8a5cd5369f1f844a1364efc163a130fc6101cd7e50",
+    "f0d1c3ff7f2633ca1ccb11ed359dd0d01675491f031a4c4c61f5c25e62d37887",
   ],
   [
     "docs/assets/import-empty-desktop.png",
@@ -32,11 +36,11 @@ const reviewedAssets = new Map([
   ],
   [
     "docs/assets/import-report-desktop.png",
-    "7cb0bbadc77bcc375bf33d76dba4e6580a5fc2673c96a46f19bb0c9c1285a8e7",
+    "6268edfb4d861c576b7176653d078bf52f7b8fb502fefe6d870be441ed0a2b42",
   ],
   [
     "docs/assets/import-report-mobile.png",
-    "88653d9868f955cc8c8d8817a0c4509fddd5b0b37532ba2ca64e6dd38908de18",
+    "4c591056ee6893b46729fda2797826337ec27aa008e6ac1877f992d7af3123a7",
   ],
   [
     "public/icon.svg",
