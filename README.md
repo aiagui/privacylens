@@ -35,7 +35,8 @@ running locally, using synthetic example data.
 
 **Follow a finding all the way to its evidence.** The sample report lets you explore request timings and shows detected
 technologies, cookie attributes, third-party destinations and possible consent
-manager signals before any interaction with consent controls.
+manager signals from the initial page load. Each finding is labeled observed,
+inferred or unknown.
 
 <details>
 <summary>Explore the full report: optical header, interactive request window and detailed evidence</summary>
@@ -48,7 +49,7 @@ manager signals before any interaction with consent controls.
 [View the mobile report](docs/assets/report-mobile.png)
 
 After [starting the app](#run-it-locally), open
-[the sample report](http://127.0.0.1:3000/sample). It is bundled demonstration
+the sample report (`/sample` when running locally). It is bundled demonstration
 data, with no live website scanned.
 
 ## Evidence you can understand
@@ -94,7 +95,7 @@ npx playwright install chromium
 npm run dev
 ```
 
-Open [PrivacyLens](http://127.0.0.1:3000), then choose **Explore a sample report**.
+Open <http://127.0.0.1:3000> after `npm run dev`, then choose **Explore a sample report**.
 No accounts, API keys or environment files are needed.
 
 For fixture development, verification commands and the project map, see

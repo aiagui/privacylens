@@ -1,4 +1,7 @@
+import { SIGNATURE_SET_VERSION } from "./scanner/signatures";
 import type { ScanReport } from "./scanner/types";
+
+const signature = (id: string) => ({ id, version: SIGNATURE_SET_VERSION });
 
 // Bundled, deterministic example data for the public "sample report" page.
 // It is never produced by scanning anything and must never be swapped for
@@ -9,37 +12,42 @@ export const SAMPLE_REPORT: ScanReport = {
   targetUrl: "https://sample-shop.example",
   scannedAt: "2026-10-01T09:14:00.000Z",
   status: "completed",
+  signatureSetVersion: SIGNATURE_SET_VERSION,
   technologies: [
     {
       name: "Google Tag Manager",
+      signature: signature("google-tag-manager"),
       category: "tag-manager",
       observation: "inferred",
       evidence: [
-        "Resource requested from https://www.googletagmanager.com (blocked if outside fixture)",
+        "Resource requested from a recognized Google Tag Manager host (google-tag-manager). This does not show that data was sent. Destination: https://www.googletagmanager.com",
       ],
     },
     {
       name: "Google Analytics",
+      signature: signature("google-analytics"),
       category: "analytics",
       observation: "observed",
       evidence: [
-        "Tracking request initiated to https://www.google-analytics.com (blocked by fixture policy)",
+        "Request to a recognized Google Analytics collection endpoint (google-analytics). Initiation only; payload not inspected. This endpoint pattern is not yet confirmed by vendor documentation. Destination: https://www.google-analytics.com",
       ],
     },
     {
       name: "Meta Pixel",
+      signature: signature("meta-pixel"),
       category: "advertising",
       observation: "observed",
       evidence: [
-        "Tracking request initiated to https://www.facebook.com (blocked by fixture policy)",
+        "Request to a recognized Meta Pixel collection endpoint (meta-pixel). Initiation only; payload not inspected. This endpoint pattern is not yet confirmed by vendor documentation. Destination: https://www.facebook.com",
       ],
     },
     {
       name: "Microsoft Clarity",
+      signature: signature("microsoft-clarity"),
       category: "session-replay",
       observation: "inferred",
       evidence: [
-        "Resource requested from https://www.clarity.ms (blocked if outside fixture)",
+        "Resource requested from a recognized Microsoft Clarity host (microsoft-clarity). This does not show that data was sent. Destination: https://www.clarity.ms",
       ],
     },
   ],
@@ -87,6 +95,7 @@ export const SAMPLE_REPORT: ScanReport = {
       timeMs: 182,
       beforeConsent: true,
       resourceType: "script",
+      classification: "inferred",
     },
     {
       url: "https://www.google-analytics.com",
@@ -95,6 +104,7 @@ export const SAMPLE_REPORT: ScanReport = {
       timeMs: 341,
       beforeConsent: true,
       resourceType: "fetch",
+      classification: "observed",
     },
     {
       url: "https://www.facebook.com",
@@ -103,6 +113,7 @@ export const SAMPLE_REPORT: ScanReport = {
       timeMs: 398,
       beforeConsent: true,
       resourceType: "fetch",
+      classification: "observed",
     },
     {
       url: "https://www.clarity.ms",
@@ -111,6 +122,15 @@ export const SAMPLE_REPORT: ScanReport = {
       timeMs: 455,
       beforeConsent: true,
       resourceType: "script",
+      classification: "inferred",
+    },
+    {
+      url: "https://cdn.assets-sample.example",
+      domain: "cdn.assets-sample.example",
+      timeMs: 512,
+      beforeConsent: true,
+      resourceType: "image",
+      classification: "unknown",
     },
   ],
   cmp: {

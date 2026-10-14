@@ -116,6 +116,23 @@ try {
     /Google Analytics/,
   );
   assert.match(await page.locator(".journey-detail").innerText(), /fetch/);
+  assert.match(await page.locator(".journey-detail").innerText(), /OBSERVED/);
+  assert.match(
+    await page.locator(".journey-detail").innerText(),
+    /Whether data arrived/,
+  );
+  // An unrecognized destination must display UNKNOWN, never a guess.
+  await page
+    .getByRole("button", { name: /cdn\.assets-sample\.example/ })
+    .click();
+  const unknownDetail = await page.locator(".journey-detail").innerText();
+  assert.match(unknownDetail, /UNKNOWN/);
+  assert.match(unknownDetail, /not established/);
+  assert.doesNotMatch(unknownDetail, /Before interaction|Before consent/);
+  const reportText = await page.locator("main").innerText();
+  assert.match(reportText, /signature google-analytics, set /);
+  assert.doesNotMatch(reportText, /Before consent interaction|Behind the page/);
+  await page.getByRole("button", { name: /Google Analytics/ }).click();
   assert.equal(
     await page
       .getByRole("button", { name: /Google Analytics/ })

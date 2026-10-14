@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OpticalField } from "@/components/optical-field";
 import { SiteHeader, SiteFooter, SOURCE_URL } from "@/components/site-chrome";
-import { EvidenceLabel } from "@/components/report-view";
+import { EvidenceLabel } from "@/components/evidence";
 import { SAMPLE_REPORT } from "@/sample-report";
 
 export default function Home() {
@@ -22,9 +22,9 @@ export default function Home() {
                 <em>of what follows you.</em>
               </h1>
               <p className="hero-copy">
-                Bring a website&apos;s hidden activity into focus. Understand
-                tracking technologies, cookies and third-party requests through
-                the evidence behind each finding.
+                Bring a website&apos;s third-party activity into focus.
+                Understand tracking technologies, cookies and third-party
+                requests through the evidence behind each finding.
               </p>
               <div className="hero-actions">
                 <Link className="primary-link" href="/sample">
@@ -74,7 +74,7 @@ export default function Home() {
               <OpticalField />
               <div className="field-caption preview-caption">
                 <span>FROM SIGNAL TO EVIDENCE</span>
-                <span>BEFORE INTERACTION</span>
+                <span>INITIAL PAGE LOAD</span>
               </div>
               <div className="report-preview">
                 <div className="preview-topline">
@@ -85,7 +85,7 @@ export default function Home() {
                   <span className="sample-tag">SAMPLE DATA</span>
                 </div>
                 <h2>sample-shop.example</h2>
-                <p>Initial page load · Before consent interaction</p>
+                <p>Initial page load · No consent choice made</p>
                 <div className="preview-summary">
                   <div>
                     <strong>
@@ -123,16 +123,14 @@ export default function Home() {
                   Read the evidence <span aria-hidden="true">→</span>
                 </Link>
               </div>
-              <p className="preview-footnote">
-                Bundled example data. Transparent by design.
-              </p>
+              <p className="preview-footnote">Bundled example data.</p>
             </div>
           </section>
           <div className="trust-strip container">
-            <span>Less guesswork. More clarity.</span>
+            <span>Observed, inferred or unknown.</span>
             <span>Evidence-led findings</span>
-            <span>Before consent interaction</span>
-            <span>Open inspection</span>
+            <span>No consent choice made</span>
+            <span>Open-source code</span>
           </div>
         </div>
         <section
@@ -148,8 +146,8 @@ export default function Home() {
               <span>Understand the evidence.</span>
             </h2>
             <p>
-              Every finding has a source. Every interpretation has a limit.
-              PrivacyLens keeps both in view.
+              Every finding names the rule behind it. Every interpretation has a
+              limit. PrivacyLens keeps both in view.
             </p>
           </div>
           <div className="feature-grid">
@@ -188,8 +186,8 @@ export default function Home() {
               </div>
               <h3>Network activity</h3>
               <p>
-                Trace third-party destinations and requests before any
-                interaction with consent controls.
+                Trace third-party destinations and requests during the initial
+                page load, before any consent choice is made.
               </p>
             </article>
           </div>

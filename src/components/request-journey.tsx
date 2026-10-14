@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import type { RequestFinding } from "@/scanner/types";
+import {
+  CLASSIFICATION_EXPLANATION,
+  EvidenceLabel,
+  classificationOf,
+} from "@/components/evidence";
 
 function timing(request: RequestFinding) {
   return Number.isFinite(request.timeMs) && request.timeMs >= 0
@@ -30,7 +35,10 @@ export function RequestJourney({
         <div>
           <p className="section-kicker">THE REQUEST WINDOW</p>
           <h2 id="journey-heading">The first moments.</h2>
-          <p>{requests.length} request signals. Before consent interaction.</p>
+          <p>
+            {requests.length} request signals from the initial page load. No
+            consent choice was made.
+          </p>
         </div>
         <span className="sample-tag">
           {sample ? "SAMPLE DATA" : "INITIAL PAGE LOAD"}
@@ -86,7 +94,7 @@ export function RequestJourney({
                     y={y - 18}
                     fill={active ? "#dae1ff" : "#aeb8cd"}
                     textAnchor="middle"
-                    fontSize="10"
+                    fontSize="13"
                     fontFamily="monospace"
                   >
                     {elapsed === null ? "Unknown" : elapsed + " ms"}
@@ -145,8 +153,17 @@ export function RequestJourney({
         </div>
         <div>
           <span className="section-kicker">CONSENT STATE</span>
-          <strong>Before interaction</strong>
+          <strong>
+            {current.beforeConsent ? "No choice made yet" : "Not established"}
+          </strong>
         </div>
+        <div>
+          <span className="section-kicker">EVIDENCE</span>
+          <EvidenceLabel kind={classificationOf(current.classification)} />
+        </div>
+        <p className="journey-explain">
+          {CLASSIFICATION_EXPLANATION[classificationOf(current.classification)]}
+        </p>
         <a href="#network-heading">
           View request inventory <span aria-hidden="true">↓</span>
         </a>

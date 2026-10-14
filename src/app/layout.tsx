@@ -8,6 +8,8 @@ const manrope = localFont({
   display: "swap",
 });
 export const metadata: Metadata = {
+  // Loopback until a public origin is chosen; absolute preview URLs (og:image)
+  // therefore only resolve locally. Set a real origin before any deployment.
   metadataBase: new URL("http://127.0.0.1:3000"),
   title: "PrivacyLens — A clearer view of what follows you",
   description:

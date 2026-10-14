@@ -129,7 +129,7 @@ main {
 .preview-table-heading,
 .feature-topline > span:last-child {
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.12em;
   font-weight: 500;
 }
@@ -218,7 +218,7 @@ h1 em {
 }
 .url-preview-heading > span {
   color: #b5bac7;
-  font-size: 10px;
+  font-size: 12px;
 }
 .url-input-row {
   display: flex;
@@ -258,7 +258,7 @@ h1 em {
   border-radius: 4px;
   background: #303747;
   color: #c6cede;
-  font-size: 11px;
+  font-size: 12px;
 }
 .url-input-row button span {
   margin-left: 10px;
@@ -270,7 +270,7 @@ h1 em {
 .availability-note {
   margin: 10px 0 0;
   color: #b5bac7;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
 }
 .status-dot {
@@ -296,7 +296,7 @@ h1 em {
   color: #b0b6c6;
   border: 0;
   padding: 10px 0 10px 10px;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: normal;
   min-height: 36px;
 }
@@ -341,7 +341,7 @@ h1 em {
   align-items: center;
   gap: 12px;
   color: #b9becb;
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 30px;
 }
 .preview-topline .status-dot {
@@ -365,7 +365,7 @@ h1 em {
 }
 .report-preview > p {
   color: #b5bac7;
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 24px;
 }
 .preview-summary {
@@ -414,7 +414,7 @@ h1 em {
   gap: 10px;
   border-top: 1px solid #353b49;
   padding: 13px 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .preview-link {
   display: flex;
@@ -423,14 +423,14 @@ h1 em {
   margin-top: 4px;
   padding-top: 20px;
   border-top: 1px solid #353b49;
-  font-size: 11px;
+  font-size: 12px;
   color: #c0cdff;
   text-decoration: none;
 }
 .preview-footnote {
   margin: 12px 0 0;
   color: #b5bac7;
-  font-size: 10px;
+  font-size: 12px;
 }
 .trust-strip {
   padding-block: 25px;
@@ -440,7 +440,7 @@ h1 em {
   gap: 20px;
   border-top: 1px solid #30343e;
   color: #b5bac7;
-  font-size: 11px;
+  font-size: 12px;
 }
 .trust-strip span:not(:first-child)::before {
   content: "✓";
@@ -520,7 +520,7 @@ h1 em {
   align-items: baseline;
   gap: 30px;
   margin-top: 28px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .boundary-note .section-kicker {
   flex-shrink: 0;
@@ -563,7 +563,7 @@ h1 em {
   gap: 24px;
   border-top: 1px solid var(--line);
   padding-block: 28px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .site-footer .brand {
@@ -614,7 +614,7 @@ h1 em {
 }
 .report-timestamp {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .summary-grid {
   display: grid;
@@ -650,7 +650,7 @@ h1 em {
   flex-wrap: wrap;
   gap: 12px 24px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 28px;
   scroll-margin-top: 24px;
 }
@@ -845,7 +845,7 @@ tbody tr:last-child > * {
 }
 .table-help {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin: 0 0 12px;
   display: none;
 }
@@ -916,7 +916,7 @@ tbody tr:last-child > * {
     height: 30px;
   }
   .site-header nav {
-    font-size: 11px;
+    font-size: 12px;
     gap: 12px;
   }
   .site-header .source-link {
@@ -948,12 +948,12 @@ tbody tr:last-child > * {
     padding-inline: 14px;
   }
   .text-link {
-    font-size: 11px;
+    font-size: 12px;
     gap: 8px;
   }
   .availability-note {
     margin-top: 10px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .url-input-row {
     flex-wrap: wrap;
@@ -971,7 +971,7 @@ tbody tr:last-child > * {
   .trust-strip {
     flex-wrap: wrap;
     gap: 14px 22px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .trust-strip span:first-child {
     width: 100%;
@@ -1036,7 +1036,7 @@ tbody tr:last-child > * {
     padding-bottom: 48px;
   }
   .sample-banner {
-    font-size: 11px;
+    font-size: 12px;
     margin-bottom: 28px;
   }
   .report-heading-row {
@@ -1054,11 +1054,11 @@ tbody tr:last-child > * {
     font-size: 28px;
   }
   .summary-grid span {
-    font-size: 10px;
+    font-size: 12px;
   }
   .interpretation-note {
     flex-direction: column;
-    font-size: 11px;
+    font-size: 12px;
     gap: 8px;
   }
   .report-grid {
@@ -1142,7 +1142,7 @@ tbody tr:last-child > * {
 }
 .report-focus .report-timestamp {
   color: #b5bac7;
-  font-size: 10px;
+  font-size: 12px;
 }
 .report-focus :focus-visible,
 .journey-panel :focus-visible {
@@ -1167,7 +1167,7 @@ tbody tr:last-child > * {
   padding-top: 16px;
   margin: 0;
   color: #c2c9db;
-  font-size: 10px;
+  font-size: 12px;
 }
 .report-window span {
   color: var(--optical);
@@ -1223,7 +1223,7 @@ tbody tr:last-child > * {
 }
 .journey-figure-note {
   color: #b5becf;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
   max-width: 380px;
   margin: 0;
@@ -1269,7 +1269,7 @@ tbody tr:last-child > * {
 .destination-list small {
   display: block;
   color: #b1bcd3;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 3px;
 }
 .destination-time {
@@ -1281,8 +1281,8 @@ tbody tr:last-child > * {
 }
 .journey-detail {
   display: grid;
-  grid-template-columns: 1.1fr 0.7fr 1fr auto;
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px 24px;
   margin-top: 28px;
   padding-top: 22px;
   border-top: 1px solid #394254;
@@ -1304,7 +1304,7 @@ tbody tr:last-child > * {
 }
 .journey-detail a {
   color: #c7d2ff;
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: none;
   padding-block: 12px;
 }
@@ -1430,5 +1430,33 @@ tbody tr:last-child > * {
   .reading-guide-grid {
     grid-template-columns: 1fr;
     gap: 18px;
+  }
+}
+
+.item-explain,
+.journey-explain,
+.signature-note {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.item-explain {
+  margin: 6px 0 0;
+}
+.signature-note {
+  margin: 0 0 16px;
+}
+.journey-explain {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #c9d1e4;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }

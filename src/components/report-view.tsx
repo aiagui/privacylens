@@ -1,6 +1,13 @@
 import type { ScanReport } from "@/scanner/types";
 import { OpticalField } from "@/components/optical-field";
 import { RequestJourney } from "@/components/request-journey";
+import {
+  CLASSIFICATION_EXPLANATION,
+  EvidenceLabel,
+  classificationOf,
+} from "@/components/evidence";
+
+export { EvidenceLabel };
 
 function displayDate(date: string): string {
   const parsed = new Date(date);
@@ -23,18 +30,6 @@ function displayTarget(url: string): string {
   } catch {
     return "Scanned website";
   }
-}
-
-export function EvidenceLabel({
-  kind,
-}: {
-  kind: "observed" | "inferred" | "unknown";
-}) {
-  return (
-    <span className={`evidence-label evidence-${kind}`}>
-      {kind.toUpperCase()}
-    </span>
-  );
 }
 
 function EmptyState({ children }: { children: React.ReactNode }) {
@@ -79,7 +74,7 @@ export function ReportView({
               {sample ? "SAMPLE INSPECTION" : "WEBSITE INSPECTION"}
             </p>
             <h1 id="report-heading">
-              What we observed<span>Behind the page.</span>
+              What we observed<span>During page load.</span>
             </h1>
             <p className="report-target">{displayTarget(report.targetUrl)}</p>
             <p className="report-context">
@@ -95,7 +90,7 @@ export function ReportView({
         <div className="report-optics">
           <OpticalField />
           <p className="report-window">
-            Initial page load <span>Before consent interaction</span>
+            Initial page load <span>No consent choice made</span>
           </p>
         </div>
       </div>
@@ -130,6 +125,14 @@ export function ReportView({
           <EvidenceLabel kind="unknown" /> Not established by this observation
         </span>
       </div>
+
+      {report.signatureSetVersion && (
+        <p className="signature-note">
+          Detection rules: signature set {report.signatureSetVersion}. Rules are
+          heuristics and incomplete; each finding names the rule that produced
+          it.
+        </p>
+      )}
 
       <details className="reading-guide">
         <summary>How to read these signals</summary>
@@ -173,17 +176,18 @@ export function ReportView({
                 <li key={`${technology.name}-${index}`}>
                   <div className="list-title-row">
                     <strong>{technology.name}</strong>
-                    <EvidenceLabel
-                      kind={
-                        technology.observation === "observed"
-                          ? "observed"
-                          : "inferred"
-                      }
-                    />
+                    <EvidenceLabel kind={technology.observation} />
                   </div>
                   {technology.category && (
-                    <p className="item-meta">{technology.category}</p>
+                    <p className="item-meta">
+                      {technology.category}
+                      {technology.signature &&
+                        ` · signature ${technology.signature.id}, set ${technology.signature.version}`}
+                    </p>
                   )}
+                  <p className="item-explain">
+                    {CLASSIFICATION_EXPLANATION[technology.observation]}
+                  </p>
                   {technology.evidence?.length > 0 && (
                     <ul className="evidence-details">
                       {technology.evidence.map((item, evidenceIndex) => (
@@ -218,8 +222,8 @@ export function ReportView({
             {report.cmp?.evidence && <p>{report.cmp.evidence}</p>}
           </div>
           <p className="panel-footnote">
-            This scan observes the page before any interaction. It does not
-            accept or reject consent, and cannot determine legal compliance.
+            This scan observes the initial page load only. It does not accept or
+            reject consent, and cannot determine legal compliance.
           </p>
         </section>
       </div>
@@ -241,7 +245,8 @@ export function ReportView({
             <strong>HttpOnly</strong> prevents page scripts from reading the
             cookie. <strong>SameSite</strong> controls when it accompanies
             cross-site requests. These flags describe browser handling, not the
-            cookie&apos;s purpose. Cookie values are omitted.
+            cookie&apos;s purpose. This report format does not include cookie
+            values.
           </p>
         </details>
         {cookies.length ? (
@@ -323,15 +328,21 @@ export function ReportView({
                   <tr>
                     <th scope="col">Destination</th>
                     <th scope="col">Technology</th>
+                    <th scope="col">Evidence</th>
                     <th scope="col">Timing</th>
-                    <th scope="col">Consent state</th>
+                    <th scope="col">Consent choice</th>
                   </tr>
                 </thead>
                 <tbody>
                   {requests.map((request, index) => (
                     <tr key={`${request.url}-${index}`}>
                       <th scope="row">{request.domain || request.url}</th>
-                      <td>{request.technology ?? "Unknown"}</td>
+                      <td>{request.technology ?? "Not identified"}</td>
+                      <td>
+                        <EvidenceLabel
+                          kind={classificationOf(request.classification)}
+                        />
+                      </td>
                       <td>
                         {typeof request.timeMs === "number"
                           ? `${Math.round(request.timeMs)} ms`
@@ -339,8 +350,8 @@ export function ReportView({
                       </td>
                       <td>
                         {request.beforeConsent
-                          ? "Before interaction"
-                          : "Unknown"}
+                          ? "None made yet"
+                          : "Not established"}
                       </td>
                     </tr>
                   ))}
@@ -354,8 +365,8 @@ export function ReportView({
           </EmptyState>
         )}
         <p className="panel-footnote">
-          Sensitive payloads, session tokens, and authorization headers are not
-          included in this report.
+          This report format does not include request payloads, cookie values,
+          authorization headers or URL paths and query strings.
         </p>
       </section>
 

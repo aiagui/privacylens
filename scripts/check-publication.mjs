@@ -12,19 +12,19 @@ function git(...args) {
 const reviewedAssets = new Map([
   [
     "docs/assets/home-desktop.png",
-    "8b2d77a4f44c1b2585deccb04e12d8338276e2e84594d51b8671c3512d5d1b67",
+    "d22202de61b3a233a73a39f74ee37615b1b40e30b8f3e7f24a9d5e93777bbde5",
   ],
   [
     "docs/assets/home-mobile.png",
-    "ae4740c3d64a94363fe7a068b66dee6cc4b77a1276d2040f2b1f9cd4cb5a7c21",
+    "8accf19d1f9b0266c0c4b6fd72e86ec42a29a2e147469b40728dab6dfebea2ff",
   ],
   [
     "docs/assets/report-desktop.png",
-    "1b693568a6915b24ef71d4d8ab13bbf6e21a9ec2e01a3520e4d0a27f6ad637bf",
+    "4fd3ece09ec56e9507cfcad0c66b598dcdd71a8f86d691e91847e8ea565ec59b",
   ],
   [
     "docs/assets/report-mobile.png",
-    "b3656973e695a5be49b1f067095820111efadd6cb57609f1e7d56b8a1152d925",
+    "f4d38c075fe3097da342d84baad6f0f206698a91ecfc53048cc67087e4d2f86e",
   ],
   [
     "public/icon.svg",
