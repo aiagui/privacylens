@@ -157,6 +157,18 @@ export function RequestJourney({
             {current.beforeConsent ? "No choice made yet" : "Not established"}
           </strong>
         </div>
+        {current.outcome && (
+          <div>
+            <span className="section-kicker">OUTCOME</span>
+            <strong>
+              {current.outcome === "completed"
+                ? "Completed"
+                : current.outcome === "failed"
+                  ? "Failed"
+                  : "Refused by filter"}
+            </strong>
+          </div>
+        )}
         <div>
           <span className="section-kicker">EVIDENCE</span>
           <EvidenceLabel kind={classificationOf(current.classification)} />

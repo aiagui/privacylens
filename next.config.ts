@@ -18,7 +18,23 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+            // Beyond framing and plugins: pages may only load their own images,
+            // fonts and connections, and may not submit forms or embed frames or
+            // media. Scripts and styles are not restricted here because the
+            // framework needs inline ones. This is a safety net behind the
+            // rule that imported report values are only ever rendered as text.
+            value: [
+              "frame-ancestors 'none'",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "img-src 'self' data:",
+              "font-src 'self'",
+              "connect-src 'self'",
+              "media-src 'none'",
+              "frame-src 'none'",
+              "worker-src 'none'",
+              "form-action 'none'",
+            ].join("; "),
           },
         ],
       },

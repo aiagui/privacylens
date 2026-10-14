@@ -9,9 +9,14 @@ that redirect destinations receive zero hits and cookie values/query strings do
 not enter reports. Route tests prove production denial, fixed fixture selection
 and rejection of prototype-property fixture IDs.
 
-`npm run test:e2e` starts the built application on an ephemeral loopback port,
-opens it with Chromium and checks the sample report, disabled endpoints, security
-headers and absence of external browser requests. Run `npm run build` first.
+`npm run test:e2e` runs two scripts against the built application on an ephemeral
+loopback port. The first opens it with Chromium and checks the sample report,
+disabled endpoints, security headers and absence of external browser requests. The
+second runs the real CLI code path against a local fixture, then imports the report
+it wrote at `/import` and checks the display, error handling, keyboard use, drag
+and drop, hostile content, absence of network traffic and storage, and layout on
+phones. Run `npm run build` first. Where Chromium's sandbox cannot start (see
+ci-and-releases.md) the fixture scan says so and runs without it.
 
 No runtime secrets or local environment files are needed. Agent instruction file
 generation is disabled in Next.js; any personal tooling configuration stays local
@@ -45,7 +50,7 @@ before running the publication guard: it inspects the Git index. Scanner tests
 need Chromium; on Linux use npx playwright install --with-deps chromium.
 
 To refresh the public product screenshots, set PRIVACYLENS_SCREENSHOT_DIR to
-docs/assets when running npm run test:e2e after a build. Review all four PNGs and
+docs/assets when running npm run test:e2e after a build. Review all the PNGs and
 their metadata, then update their asset fingerprints in the publication guard.
 
 ## Project map

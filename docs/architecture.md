@@ -99,6 +99,32 @@ behavior of the sandbox, `ps`-based memory limits and `getaddrinfo`; PAC/WPAD
 autodetection, mDNS and multicast; `preconnect` and `dns-prefetch` hints; other
 Chromium versions; behind a corporate proxy.
 
+## Opening a report in the browser (v0.2.0 in development)
+
+`/import` opens a JSON report written by the local scanner, entirely in the
+visitor's browser. The report format is specified in
+[report-format.md](report-format.md) and versioned with `schemaVersion`.
+
+- `src/report/validate.ts` is the trust boundary. It accepts exactly one schema
+  version, rejects every unknown field (including `__proto__`), bounds every
+  string and list, and builds a new object from validated fields; the parsed file
+  is never reused. `src/report/import.ts` checks the size (5 MB) before reading,
+  parses, and never throws.
+- `src/components/report-import.tsx` reads the file with the File API. It makes no
+  network request and uses no cookie, localStorage, sessionStorage, IndexedDB or
+  cache; closing the report discards it. Errors are announced and focus moves to
+  them; after a report opens, focus moves to its heading.
+- The existing report components display it, labeled as imported. Every imported
+  value is rendered as text, never as markup, a link, an image or a style.
+- The Content-Security-Policy limits images, fonts, connections, frames, media and
+  forms to the site itself, as a safety net behind that rule.
+
+Limits. The importer checks format, not authenticity: a file can be edited, and a
+well-formed report can still be false. Validation caps sizes but cannot judge
+whether the evidence strings are accurate. Display relies on React's escaping; the
+rendering tests and the browser test exercise hostile values, but they are not a
+proof.
+
 ## Decision: keep live scanning disabled
 
 Application-level DNS and IP validation cannot prevent all SSRF or DNS rebinding.

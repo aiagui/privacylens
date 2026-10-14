@@ -1,5 +1,5 @@
 import { SIGNATURE_SET_VERSION } from "./scanner/signatures";
-import type { ScanReport } from "./scanner/types";
+import { REPORT_SCHEMA_VERSION, type ScanReport } from "./scanner/types";
 
 const signature = (id: string) => ({ id, version: SIGNATURE_SET_VERSION });
 
@@ -9,6 +9,7 @@ const signature = (id: string) => ({ id, version: SIGNATURE_SET_VERSION });
 // domain stays on the IETF-reserved "example" TLD (RFC 2606) for exactly
 // this reason.
 export const SAMPLE_REPORT: ScanReport = {
+  schemaVersion: REPORT_SCHEMA_VERSION,
   targetUrl: "https://sample-shop.example",
   scannedAt: "2026-10-01T09:14:00.000Z",
   status: "completed",

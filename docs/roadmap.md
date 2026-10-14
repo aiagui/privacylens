@@ -75,8 +75,18 @@ The public web API stays disabled.
 ## v0.2.0: web report integration
 
 Display real scanner results (JSON from the CLI) in the existing PrivacyLens
-interface, without enabling server-side scanning. Needs a report validator, since
-the interface would then render files it did not produce.
+interface, without enabling server-side scanning.
+
+In development on a branch, not on `main` until reviewed and merged: a documented,
+versioned report format ([report-format.md](report-format.md)), strict
+validation of imported files, an accessible `/import` page that reads the file in
+the browser without uploading or storing it, display through the existing
+interactive report with per-request outcomes and a "how this was collected"
+panel, and browser tests that import a report written by the real CLI code path.
+
+Remaining before v0.2.0: a human review of the import boundary, a screen-reader
+and cross-browser pass, and a decision on whether imported reports can be shared
+or exported again.
 
 ## v0.3.0: hosted scanning
 

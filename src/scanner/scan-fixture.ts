@@ -2,7 +2,12 @@ import { chromium } from "playwright";
 import { assessRequest, isThirdParty, safeDestination } from "./detectors.ts";
 import { detectConsentManager, toCookieFindings } from "./collector-common.ts";
 import { SIGNATURE_SET_VERSION } from "./signatures.ts";
-import type { RequestFinding, ScanReport, TechnologyFinding } from "./types.ts";
+import {
+  REPORT_SCHEMA_VERSION,
+  type RequestFinding,
+  type ScanReport,
+  type TechnologyFinding,
+} from "./types.ts";
 import { UnsafeTargetError, validateFixtureUrl } from "./url-policy.ts";
 
 const MAX_REQUESTS = 300;
@@ -132,6 +137,7 @@ export async function scanFixture(
     const cookies = toCookieFindings(await context.cookies(), url.hostname);
 
     return {
+      schemaVersion: REPORT_SCHEMA_VERSION,
       targetUrl: url.origin,
       scannedAt: new Date().toISOString(),
       status: "completed",

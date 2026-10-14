@@ -14,7 +14,12 @@ import {
   type EgressOptions,
 } from "./egress-proxy.ts";
 import { SIGNATURE_SET_VERSION } from "./signatures.ts";
-import type { RequestFinding, ScanReport, TechnologyFinding } from "./types.ts";
+import {
+  REPORT_SCHEMA_VERSION,
+  type RequestFinding,
+  type ScanReport,
+  type TechnologyFinding,
+} from "./types.ts";
 import { UnsafeTargetError } from "./url-policy.ts";
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
@@ -512,6 +517,7 @@ export async function scanLive(
       });
 
     return {
+      schemaVersion: REPORT_SCHEMA_VERSION,
       targetUrl: loaded.origin,
       scannedAt: new Date(startedAt).toISOString(),
       status: "completed",

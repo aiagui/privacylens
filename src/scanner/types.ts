@@ -64,7 +64,15 @@ export interface ScanProvenance {
   };
 }
 
+/**
+ * Version of the JSON report format (docs/report-format.md). Readers accept only
+ * versions they know; any change to a field's meaning, or any added or removed
+ * field, increments it.
+ */
+export const REPORT_SCHEMA_VERSION = 1;
+
 export interface ScanReport {
+  schemaVersion: typeof REPORT_SCHEMA_VERSION;
   targetUrl: string;
   scannedAt: string;
   status: "completed";
