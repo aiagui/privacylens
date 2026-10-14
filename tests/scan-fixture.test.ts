@@ -114,6 +114,12 @@ describe("browser fixture scan", () => {
     expect(
       report.technologies.filter((tech) => tech.observation === "observed"),
     ).toEqual([]);
+    expect(
+      report.thirdPartyRequests.every(
+        (request) => request.classification === "unknown",
+      ),
+    ).toBe(true);
+    expect(report.signatureSetVersion).toBeTruthy();
   }, 20_000);
 
   it("still raises the concern for a genuine collection request", async () => {

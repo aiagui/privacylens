@@ -1,65 +1,10 @@
 import { getDomain } from "tldts";
-import type { TechnologyFinding } from "./types";
-
-interface Signature {
-  name: string;
-  category: TechnologyFinding["category"];
-  domains: string[];
-  path?: RegExp;
-  scriptOnly?: boolean;
-}
-
-const signatures: Signature[] = [
-  {
-    name: "Google Analytics",
-    category: "analytics",
-    domains: ["google-analytics.com", "analytics.google.com"],
-    path: /(?:^|\/)(?:[gjr]\/collect|collect|analytics\.js)\/?$/i,
-  },
-  {
-    name: "Google Tag Manager",
-    category: "tag-manager",
-    domains: ["googletagmanager.com"],
-  },
-  {
-    name: "Google Ads",
-    category: "advertising",
-    domains: ["googleadservices.com", "doubleclick.net"],
-  },
-  {
-    name: "Meta Pixel",
-    category: "advertising",
-    domains: ["facebook.com", "facebook.net"],
-    path: /^\/(?:tr\/?$|(?:.*\/)?fbevents\.js$)/i,
-  },
-  {
-    name: "TikTok Pixel",
-    category: "advertising",
-    domains: ["tiktok.com", "tiktokcdn.com"],
-  },
-  {
-    name: "LinkedIn Insight Tag",
-    category: "advertising",
-    domains: ["licdn.com", "linkedin.com"],
-    path: /^\/(?:(?:collect|px)\/?$|(?:.*\/)?insight(?:\.min)?\.js$)/i,
-  },
-  {
-    name: "Microsoft Clarity",
-    category: "session-replay",
-    domains: ["clarity.ms"],
-  },
-  {
-    name: "Plausible Analytics",
-    category: "analytics",
-    domains: ["plausible.io"],
-  },
-  {
-    name: "Matomo",
-    category: "analytics",
-    domains: [],
-    path: /(?:^|\/)(?:matomo|piwik)\.(?:js|php)\/?$/i,
-  },
-];
+import {
+  signatures,
+  SIGNATURE_SET_VERSION,
+  type Signature,
+} from "./signatures";
+import type { Classification, TechnologyFinding } from "./types";
 
 export function registrableDomain(hostname: string): string {
   return getDomain(hostname) ?? hostname.replace(/^\[|\]$/g, "");
@@ -74,25 +19,83 @@ export function isThirdParty(
   );
 }
 
-export function detectTechnology(
-  url: URL,
-): Pick<TechnologyFinding, "name" | "category"> | undefined {
+function hostMatches(signature: Signature, host: string): boolean {
+  return signature.domains.some(
+    (domain) => host === domain || host.endsWith(`.${domain}`),
+  );
+}
+
+function matchSignature(url: URL): Signature | undefined {
   const host = url.hostname.toLowerCase();
-  const signature = signatures.find((candidate) => {
-    const domainMatches = candidate.domains.some(
-      (domain) => host === domain || host.endsWith(`.${domain}`),
-    );
+  return signatures.find((candidate) => {
     if (candidate.domains.length === 0)
       return candidate.path?.test(url.pathname) ?? false;
     return (
-      domainMatches && (!candidate.path || candidate.path.test(url.pathname))
+      hostMatches(candidate, host) &&
+      (!candidate.path || candidate.path.test(url.pathname))
     );
   });
+}
+
+export function detectTechnology(
+  url: URL,
+): Pick<TechnologyFinding, "name" | "category"> | undefined {
+  const signature = matchSignature(url);
   // Return only the public fields: `signature` also carries internal match
   // config (domains, path regex) that must never reach a ScanReport.
   return signature
     ? { name: signature.name, category: signature.category }
     : undefined;
+}
+
+export interface RequestAssessment {
+  classification: Classification;
+  technology?: Pick<TechnologyFinding, "name" | "category">;
+  signature?: { id: string; version: string };
+  /** Why this classification, in terms a report can show. */
+  reason: string;
+}
+
+/**
+ * observed: a recognized vendor's collection endpoint was requested (initiation
+ *   only; delivery and payload are not established).
+ * inferred: a recognized vendor resource (e.g. a script) was requested; whether
+ *   it sends data is not shown.
+ * unknown: no signature explains the request, or a vendor domain was contacted
+ *   at a path no signature recognizes.
+ */
+export function assessRequest(
+  url: URL,
+  resourceType: string,
+): RequestAssessment {
+  const signature = matchSignature(url);
+  if (!signature) {
+    const vendor = signatures.find((candidate) =>
+      hostMatches(candidate, url.hostname.toLowerCase()),
+    );
+    return {
+      classification: "unknown",
+      reason: vendor
+        ? `Contacted a ${vendor.name} host at a path no signature recognizes; its purpose is not established.`
+        : "No known signature matches this destination; its purpose is not established.",
+    };
+  }
+  const reference = {
+    technology: { name: signature.name, category: signature.category },
+    signature: { id: signature.id, version: SIGNATURE_SET_VERSION },
+  };
+  if (isTrackingRequest(url, resourceType)) {
+    return {
+      classification: "observed",
+      ...reference,
+      reason: `Request to a recognized ${signature.name} collection endpoint (${signature.id}). Initiation only; payload not inspected.`,
+    };
+  }
+  return {
+    classification: "inferred",
+    ...reference,
+    reason: `Resource requested from a recognized ${signature.name} host (${signature.id}). This does not show that data was sent.`,
+  };
 }
 
 export function isTrackingRequest(url: URL, resourceType: string): boolean {
