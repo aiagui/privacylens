@@ -74,12 +74,12 @@ The sample illustrates the report format; it is not a measurement of a real site
 Our ambition is a more readable web: privacy inspection that people can use
 without needing to become browser specialists.
 
-| Direction               | What we're working toward                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Safe website inspection | Isolated scanning with infrastructure-enforced network boundaries before public URL input becomes available. |
-| Deeper evidence         | Broader technology coverage, clearer detection explanations and explicit observation limits.                 |
-| More useful reports     | Accessible exploration, report export and comparison across observation windows.                             |
-| An open foundation      | Documentation, reproducible fixtures and a contribution path for detectors, design and language.             |
+| Direction               | What we're working toward                                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Safe website inspection | A local command-line scanner first, then real results in the web interface, then hosted scanning once isolation is verified. |
+| Deeper evidence         | Broader technology coverage, clearer detection explanations and explicit observation limits.                                 |
+| More useful reports     | Accessible exploration, report export and comparison across observation windows.                                             |
+| An open foundation      | Documentation, reproducible fixtures and a contribution path for detectors, design and language.                             |
 
 These are planned directions, not released features or delivery promises.
 Read the [product direction](docs/product-direction.md) for the current
@@ -109,7 +109,8 @@ detector fixtures or shape the next product capabilities. Start with
 [CONTRIBUTING.md](CONTRIBUTING.md), open an
 [issue](https://github.com/aiagui/privacylens/issues), or propose a focused pull request.
 
-Explore the [architecture](docs/architecture.md),
+Explore the [roadmap](docs/roadmap.md), the [isolated-scanning proposal](docs/proposal-isolated-scanning.md),
+[signatures](docs/signatures.md), the [architecture](docs/architecture.md),
 [security boundaries](docs/security.md) and
 [visual identity](docs/visual-identity.md). To report a vulnerability privately,
 follow [SECURITY.md](SECURITY.md).
