@@ -74,12 +74,12 @@ The sample illustrates the report format; it is not a measurement of a real site
 Our ambition is a more readable web: privacy inspection that people can use
 without needing to become browser specialists.
 
-| Direction               | What we're working toward                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Safe website inspection | Isolated scanning with infrastructure-enforced network boundaries before public URL input becomes available. |
-| Deeper evidence         | Broader technology coverage, clearer detection explanations and explicit observation limits.                 |
-| More useful reports     | Accessible exploration, report export and comparison across observation windows.                             |
-| An open foundation      | Documentation, reproducible fixtures and a contribution path for detectors, design and language.             |
+| Direction               | What we're working toward                                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Safe website inspection | A local command-line scanner first, then real results in the web interface, then hosted scanning once isolation is verified. |
+| Deeper evidence         | Broader technology coverage, clearer detection explanations and explicit observation limits.                                 |
+| More useful reports     | Accessible exploration, report export and comparison across observation windows.                                             |
+| An open foundation      | Documentation, reproducible fixtures and a contribution path for detectors, design and language.                             |
 
 These are planned directions, not released features or delivery promises.
 Read the [product direction](docs/product-direction.md) for the current

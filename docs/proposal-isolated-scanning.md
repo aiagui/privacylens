@@ -1,8 +1,13 @@
 # Proposal: isolated public scanning
 
-**Status: proposal. Nothing here is implemented, deployed or approved.** Public
-scanning stays disabled (`POST /api/scan` returns 503) until this design is
-accepted, built and passes the acceptance tests below.
+**Status: proposal for v0.3.0 (hosted scanning). Nothing here is implemented,
+deployed or approved.** The maintainer has decided the sequence: v0.1.0 is a local
+CLI scanner, v0.2.0 shows real scanner results in the web interface, and hosted
+scanning follows in v0.3.0. Public scanning stays disabled (`POST /api/scan`
+returns 503) until this design is accepted, built and passes the acceptance tests
+below. The local CLI is covered in [architecture](architecture.md) once built; it
+runs on the user's own machine and is not a substitute for the isolation
+described here.
 
 ## Principle
 
@@ -28,7 +33,7 @@ the browser, the page or the application code is compromised.
    size-capped) through a one-way channel. Reports omit values, paths and payloads
    exactly as today.
 
-## Gaps between this design and the current implementation
+## Gaps between this design and the current implementation (hosted scanning)
 
 Verified against `main` when this section was written:
 
@@ -54,12 +59,12 @@ Verified against `main` when this section was written:
 
 ## Deployment options (to be decided)
 
-| Option                                | Isolation                        | Ops burden | Notes                                                                   |
-| ------------------------------------- | -------------------------------- | ---------- | ----------------------------------------------------------------------- |
-| A. Firecracker-style microVM per job  | Potentially strongest            | High       | Needs own host fleet or a provider offering it                          |
-| B. Managed container sandbox (gVisor) | Strong (unvalidated)             | Medium     | Egress rules must be enforced at the VPC/firewall, not in the container |
-| C. Short-lived VM per job             | Strong (unvalidated), slow start | Medium     | Simple to reason about; higher per-scan cost and latency                |
-| D. Run scans only locally (CLI)       | User's own machine and network   | Low        | No hosted risk, but inherits the user's network; document the limits    |
+| Option                                | Isolation                        | Ops burden | Notes                                                                                    |
+| ------------------------------------- | -------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
+| A. Firecracker-style microVM per job  | Potentially strongest            | High       | Needs own host fleet or a provider offering it                                           |
+| B. Managed container sandbox (gVisor) | Strong (unvalidated)             | Medium     | Egress rules must be enforced at the VPC/firewall, not in the container                  |
+| C. Short-lived VM per job             | Strong (unvalidated), slow start | Medium     | Simple to reason about; higher per-scan cost and latency                                 |
+| D. Run scans only locally (CLI)       | User's own machine and network   | Low        | **Chosen for v0.1.0.** No hosted risk, but inherits the user's network; see architecture |
 
 No option is selected, and the isolation ratings above are qualitative and
 unvalidated. Each option must pass the acceptance tests below to be considered. Provider, region,
@@ -116,12 +121,15 @@ headers or bodies. No third-party analytics. Publish a plain-language privacy no
 8. Retention deletion and log minimization are verified against real stored data.
 9. A reviewer who did not build the system attempts to escape the sandbox.
 
-## Open decisions for the maintainer
+## Open decisions for the maintainer (hosted scanning, v0.3.0)
 
-- Whether hosted scanning is the first usable capability, or a local CLI scan
-  ships first (see [roadmap](roadmap.md)); [product direction](product-direction.md)
-  currently names isolated hosted inspection as the first major capability.
-- Hosting provider and budget ceiling.
+Decided: a local CLI ships first (v0.1.0), then web integration (v0.2.0).
+Still open for v0.3.0:
+
+- Which option (A, B or C), hosting provider and budget ceiling.
 - Invite-only vs. account-based access at launch.
 - Retention period and opt-out policy.
-- Whether to ship the local CLI (option D) first.
+- Runtime report validation approach.
+
+The isolation ratings above are qualitative and unvalidated. Each option must pass
+the acceptance tests above to be considered.

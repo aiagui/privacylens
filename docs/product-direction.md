@@ -16,13 +16,17 @@ destinations and possible consent manager signals. It observes the initial page
 load without accepting or rejecting consent. A sample report is an illustration
 of that contract, not a real-world measurement.
 
-## Next: safe website inspection
+## Next: inspect a real website, locally first
 
-The first major capability is inspecting a user-selected website in an isolated
-worker. This requires infrastructure-enforced egress restrictions, limits on
-resource use, private-network protection and tests for redirects and alternate
-address representations. These are release gates, not optional improvements.
-The existing public endpoint stays disabled until those gates are met.
+The agreed sequence is a local CLI scanner (v0.1.0), then real scanner results in
+the web interface (v0.2.0), then hosted scanning (v0.3.0). The CLI lets people
+inspect a site they choose on their own machine, with all browser traffic passing
+through an egress filter that refuses private and local addresses. Because it
+runs on the user's machine, it is not the infrastructure isolation hosted
+scanning needs. Hosted scanning requires infrastructure-enforced egress
+restrictions, limits on resource use, abuse prevention and tests for redirects and
+alternate address representations. These are release gates, not optional
+improvements. The public web endpoint stays disabled until those gates are met.
 
 ## Then: stronger explanations and useful reports
 
