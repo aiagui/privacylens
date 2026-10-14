@@ -1,0 +1,55 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New source release tag (vMAJOR.MINOR.PATCH)"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: source-release
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/quality.yml
+  analyze:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+  publish:
+    name: Publish source release
+    needs: [validate, analyze]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate new version and create source archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.version }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || exit 1
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)" = "$RELEASE_SHA"
+          # An unsuccessful lookup must never be interpreted as permission to overwrite.
+          tags="$(gh api --paginate "repos/$GH_REPO/git/matching-refs/tags/$RELEASE_TAG" --jq '.[].ref')"
+          if printf '%s\n' "$tags" | grep -Fxq "refs/tags/$RELEASE_TAG"; then
+            echo "Release tag already exists" >&2
+            exit 1
+          fi
+          git archive --format=tar.gz --prefix="privacylens-$RELEASE_TAG/" --output=privacylens-source.tar.gz "$RELEASE_SHA"
+          sha256sum privacylens-source.tar.gz > SHA256SUMS
+          gh release create "$RELEASE_TAG" privacylens-source.tar.gz SHA256SUMS --target "$RELEASE_SHA" --title "$RELEASE_TAG" --notes "Source preview at $RELEASE_SHA. Public URL scanning remains disabled. See SECURITY.md."

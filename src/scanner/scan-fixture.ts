@@ -1,0 +1,201 @@
+import { chromium } from "playwright";
+import {
+  detectTechnology,
+  isThirdParty,
+  isTrackingRequest,
+  safeDestination,
+} from "./detectors";
+import type { RequestFinding, ScanReport, TechnologyFinding } from "./types";
+import { UnsafeTargetError, validateFixtureUrl } from "./url-policy";
+
+const MAX_REQUESTS = 300;
+const SCAN_TIMEOUT_MS = 12_000;
+
+function sanitizeCookieName(name: string): string {
+  if (
+    name.length > 128 ||
+    name.includes("@") ||
+    [...name].some((character) => character.charCodeAt(0) < 32) ||
+    /(?:bearer|token|secret|password|api[_-]?key)/i.test(name)
+  ) {
+    return "[REDACTED]";
+  }
+  return name;
+}
+
+/**
+ * Runs only against a caller-owned local fixture origin. Every other browser
+ * request is aborted; this is not a substitute for OS/container egress policy.
+ */
+export async function scanFixture(
+  target: string,
+  fixtureOrigin: string,
+): Promise<ScanReport> {
+  const url = validateFixtureUrl(target, fixtureOrigin);
+  const browser = await chromium.launch({
+    headless: true,
+    timeout: SCAN_TIMEOUT_MS,
+  });
+  const deadline = setTimeout(() => {
+    void browser.close().catch(() => undefined);
+  }, SCAN_TIMEOUT_MS);
+  try {
+    const context = await browser.newContext({
+      acceptDownloads: false,
+      serviceWorkers: "block",
+      permissions: [],
+    });
+    const page = await context.newPage();
+    const startedAt = Date.now();
+    const technologies = new Map<string, TechnologyFinding>();
+    const thirdPartyRequests: RequestFinding[] = [];
+    let totalRequests = 0;
+    let blockedNavigation = false;
+    let trackingBeforeInteraction = false;
+
+    await context.route("**/*", async (route) => {
+      totalRequests += 1;
+      if (totalRequests > MAX_REQUESTS) {
+        await route.abort();
+        return;
+      }
+
+      const request = route.request();
+      let requestUrl: URL;
+      try {
+        requestUrl = new URL(request.url());
+      } catch {
+        await route.abort();
+        return;
+      }
+
+      if (!["http:", "https:"].includes(requestUrl.protocol)) {
+        await route.abort();
+        return;
+      }
+
+      const thirdParty = isThirdParty(url.hostname, requestUrl.hostname);
+      const detected = detectTechnology(requestUrl);
+      if (detected) {
+        const tracking = isTrackingRequest(requestUrl, request.resourceType());
+        if (tracking && thirdParty) trackingBeforeInteraction = true;
+        const existing = technologies.get(detected.name);
+        const evidence = tracking
+          ? `Tracking request initiated to ${safeDestination(requestUrl)} (blocked by fixture policy)`
+          : `Resource requested from ${safeDestination(requestUrl)} (blocked if outside fixture)`;
+        technologies.set(detected.name, {
+          ...detected,
+          observation: tracking
+            ? "observed"
+            : (existing?.observation ?? "inferred"),
+          evidence: [...new Set([...(existing?.evidence ?? []), evidence])],
+        });
+      }
+      if (thirdParty) {
+        thirdPartyRequests.push({
+          url: safeDestination(requestUrl),
+          domain: requestUrl.hostname,
+          technology: detected?.name,
+          timeMs: Date.now() - startedAt,
+          beforeConsent: true,
+          resourceType: request.resourceType(),
+        });
+      }
+
+      // Never let Chromium follow a redirect implicitly after route.continue():
+      // Playwright can send it before another route handler has a chance to run.
+      if (requestUrl.origin !== fixtureOrigin) {
+        if (request.isNavigationRequest()) blockedNavigation = true;
+        await route.abort();
+        return;
+      }
+      try {
+        const response = await route.fetch({
+          maxRedirects: 0,
+          timeout: SCAN_TIMEOUT_MS,
+        });
+        if (response.status() >= 300 && response.status() < 400) {
+          if (request.isNavigationRequest()) blockedNavigation = true;
+          await route.abort();
+          return;
+        }
+        await route.fulfill({ response });
+      } catch {
+        await route.abort();
+      }
+    });
+
+    const navigationResponse = await page.goto(url.toString(), {
+      waitUntil: "domcontentloaded",
+      timeout: SCAN_TIMEOUT_MS,
+    });
+    if (
+      blockedNavigation ||
+      !navigationResponse ||
+      navigationResponse.status() < 200 ||
+      navigationResponse.status() >= 300 ||
+      new URL(page.url()).origin !== fixtureOrigin
+    ) {
+      throw new UnsafeTargetError(
+        "Navigation did not return a successful fixture response",
+      );
+    }
+    await page.waitForTimeout(500);
+
+    const cmp = await page.evaluate(() => {
+      const named: [string, string][] = [
+        ["OneTrust", "#onetrust-banner-sdk"],
+        ["Cookiebot", "#CybotCookiebotDialog"],
+        ["Didomi", "#didomi-host"],
+        ["Usercentrics", "#usercentrics-root"],
+      ];
+      for (const [name, selector] of named) {
+        if (document.querySelector(selector))
+          return { detected: true, name, evidence: selector };
+      }
+      return { detected: false };
+    });
+
+    const cookies = (await context.cookies()).map((cookie) => ({
+      name: sanitizeCookieName(cookie.name),
+      domain: cookie.domain,
+      firstParty: !isThirdParty(url.hostname, cookie.domain.replace(/^\./, "")),
+      ...(cookie.expires > 0
+        ? { expires: new Date(cookie.expires * 1000).toISOString() }
+        : {}),
+      secure: cookie.secure,
+      httpOnly: cookie.httpOnly,
+      sameSite: cookie.sameSite,
+    }));
+
+    return {
+      targetUrl: url.origin,
+      scannedAt: new Date().toISOString(),
+      status: "completed",
+      technologies: [...technologies.values()],
+      cookies,
+      thirdPartyRequests,
+      cmp,
+      concerns: trackingBeforeInteraction
+        ? [
+            {
+              title: "Tracking before interaction",
+              detail:
+                "The browser initiated a recognized third-party request before any consent interaction. The fixture policy blocked external delivery.",
+              level: "attention",
+            },
+          ]
+        : [],
+      limitations: [
+        "This result covers only the initial page load. No consent choice was made.",
+        "Third-party requests were observed at browser initiation but blocked before network delivery.",
+        "HTTP redirects are blocked, including same-origin redirects; non-success navigation responses do not produce a completed report.",
+        "CMP presence is inferred from known DOM selectors; absence is not proof that consent is unnecessary.",
+        "No GDPR compliance conclusion or privacy score is provided.",
+      ],
+    };
+  } finally {
+    clearTimeout(deadline);
+    await browser.close().catch(() => undefined);
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "privacylens",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint src tests scripts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "audit": "npm audit --audit-level=high",
+    "check:publication": "node scripts/check-publication.mjs",
+    "test:e2e": "node scripts/test-production.mjs",
+    "check": "npm run check:publication && npm run format:check && npm run lint && npm run typecheck && npm test && npm run audit && npm run build && npm run test:e2e"
+  },
+  "dependencies": {
+    "ipaddr.js": "^2.5.0",
+    "next": "16.4.0",
+    "playwright": "1.64.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tldts": "7.0.25"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.4"
+  }
+}
