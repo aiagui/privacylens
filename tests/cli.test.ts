@@ -300,3 +300,25 @@ describe("cli terminal safety and validation", () => {
     expect(h.err.join("")).not.toContain("npx playwright install");
   });
 });
+
+describe("cli report-format safeguard", () => {
+  it("warns, but still writes the report, if the scanner emits something the importer would refuse", async () => {
+    const invalid = {
+      ...JSON.parse(JSON.stringify(SAMPLE_REPORT)),
+      surprise: "x",
+    };
+    const h = harness(async () => invalid);
+    expect(await runCli(["scan", "https://example.com"], h.io)).toBe(EXIT.ok);
+    expect(h.err.join("")).toMatch(
+      /Warning: this report does not match the report format/,
+    );
+    expect(h.err.join("")).toMatch(/surprise/);
+    expect(JSON.parse(h.out.join(""))).toMatchObject({ surprise: "x" });
+  });
+
+  it("stays quiet for a valid report", async () => {
+    const h = harness(okScan);
+    await runCli(["scan", "https://example.com"], h.io);
+    expect(h.err.join("")).not.toMatch(/Warning/);
+  });
+});

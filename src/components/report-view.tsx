@@ -1,4 +1,8 @@
-import type { ScanReport } from "@/scanner/types";
+import type {
+  RequestFinding,
+  ScanProvenance,
+  ScanReport,
+} from "@/scanner/types";
 import { OpticalField } from "@/components/optical-field";
 import { RequestJourney } from "@/components/request-journey";
 import {
@@ -36,12 +40,119 @@ function EmptyState({ children }: { children: React.ReactNode }) {
   return <p className="empty-state">{children}</p>;
 }
 
+function outcomeLabel(outcome: RequestFinding["outcome"]): string {
+  if (outcome === "completed") return "Completed";
+  if (outcome === "failed") return "Failed";
+  if (outcome === "blocked") return "Refused by filter";
+  return "Not recorded";
+}
+
+function seconds(ms: number): string {
+  return `${(ms / 1000).toFixed(ms >= 10_000 ? 0 : 1)} s`;
+}
+
+function Provenance({ provenance }: { provenance: ScanProvenance }) {
+  const { egress } = provenance;
+  return (
+    <section
+      className="report-panel report-panel-wide"
+      aria-labelledby="provenance-heading"
+    >
+      <div className="panel-heading">
+        <h2 id="provenance-heading">How this report was collected</h2>
+      </div>
+      <dl className="fact-list">
+        <div>
+          <dt>Scanner</dt>
+          <dd>
+            {provenance.scanner.name} {provenance.scanner.version}
+          </dd>
+        </div>
+        <div>
+          <dt>Browser</dt>
+          <dd>Chromium {provenance.browser.version}</dd>
+        </div>
+        <div>
+          <dt>Browser sandbox</dt>
+          <dd>
+            {provenance.browser.sandbox
+              ? "On"
+              : "Off: this scan ran without Chromium's process sandbox"}
+          </dd>
+        </div>
+        <div>
+          <dt>Time</dt>
+          <dd>
+            {seconds(provenance.durationMs)} in total, with a{" "}
+            {seconds(provenance.settleMs)} wait after load, under a{" "}
+            {seconds(provenance.timeoutMs)} limit
+          </dd>
+        </div>
+        {provenance.requestedOrigin !== provenance.finalOrigin && (
+          <div>
+            <dt>Redirected</dt>
+            <dd>
+              {provenance.requestedOrigin} led to {provenance.finalOrigin}
+            </dd>
+          </div>
+        )}
+        <div>
+          <dt>Connections</dt>
+          <dd>
+            {egress.allowedConnections} allowed, {egress.blockedConnections}{" "}
+            refused for safety, {egress.failedConnections} failed
+            {egress.limitRefusals > 0
+              ? `, ${egress.limitRefusals} turned away at the connection limit`
+              : ""}
+          </dd>
+        </div>
+        {provenance.droppedRequests > 0 && (
+          <div>
+            <dt>Not listed</dt>
+            <dd>
+              {provenance.droppedRequests} ordinary requests beyond the
+              recording limit
+            </dd>
+          </div>
+        )}
+      </dl>
+      {egress.blockedDestinations.length > 0 && (
+        <>
+          <p className="table-help">
+            Destinations the scanner refused to contact. A page asking for these
+            is itself something to notice, but a refused request is not evidence
+            about what the destination would have received.
+          </p>
+          <ul className="plain-list">
+            {egress.blockedDestinations.map((destination, index) => (
+              <li key={`${destination.host}-${destination.port}-${index}`}>
+                <code>
+                  {destination.host}:{destination.port}
+                </code>{" "}
+                ({destination.reason})
+              </li>
+            ))}
+          </ul>
+          {egress.blockedDestinationsTruncated && (
+            <p className="panel-footnote">
+              More destinations were refused than are listed here.
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function ReportView({
   report,
   sample = false,
+  imported = false,
 }: {
   report: ScanReport;
   sample?: boolean;
+  /** True for a report read from a file the user chose. */
+  imported?: boolean;
 }) {
   const technologies = Array.isArray(report.technologies)
     ? report.technologies
@@ -67,13 +178,25 @@ export function ReportView({
           result of a live scan.
         </div>
       )}
+      {imported && (
+        <div className="sample-banner imported-banner" role="note">
+          <strong>Imported report.</strong> This report was read from a file you
+          chose, entirely in your browser. PrivacyLens checked that it matches
+          the report format, but it cannot verify who produced it or that it is
+          unmodified.
+        </div>
+      )}
       <div className="report-focus">
         <div className="report-heading-row">
           <div>
             <p className="eyebrow">
-              {sample ? "SAMPLE INSPECTION" : "WEBSITE INSPECTION"}
+              {sample
+                ? "SAMPLE INSPECTION"
+                : imported
+                  ? "IMPORTED INSPECTION"
+                  : "WEBSITE INSPECTION"}
             </p>
-            <h1 id="report-heading">
+            <h1 id="report-heading" tabIndex={-1}>
               What we observed<span>During page load.</span>
             </h1>
             <p className="report-target">{displayTarget(report.targetUrl)}</p>
@@ -329,6 +452,7 @@ export function ReportView({
                     <th scope="col">Destination</th>
                     <th scope="col">Technology</th>
                     <th scope="col">Evidence</th>
+                    <th scope="col">Outcome</th>
                     <th scope="col">Timing</th>
                     <th scope="col">Consent choice</th>
                   </tr>
@@ -343,6 +467,7 @@ export function ReportView({
                           kind={classificationOf(request.classification)}
                         />
                       </td>
+                      <td>{outcomeLabel(request.outcome)}</td>
                       <td>
                         {typeof request.timeMs === "number"
                           ? `${Math.round(request.timeMs)} ms`
@@ -369,6 +494,8 @@ export function ReportView({
           authorization headers or URL paths and query strings.
         </p>
       </section>
+
+      {report.provenance && <Provenance provenance={report.provenance} />}
 
       {(concerns.length > 0 || limitations.length > 0) && (
         <div className="report-grid">

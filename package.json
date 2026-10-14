@@ -17,10 +17,10 @@
     "format": "prettier --write .",
     "audit": "npm audit --audit-level=high",
     "check:publication": "node scripts/check-publication.mjs",
-    "test:e2e": "node scripts/test-production.mjs",
+    "test:e2e": "node scripts/test-production.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-import.mjs",
     "check": "npm run check:publication && npm run format:check && npm run lint && npm run typecheck && npm test && npm run audit && npm run build && npm run test:e2e",
     "scan": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/cli/privacylens.ts scan",
-    "test:sandbox": "vitest run tests/sandbox.test.ts tests/scan-live.test.ts tests/cli.test.ts"
+    "test:sandbox": "vitest run tests/sandbox.test.ts tests/scan-live.test.ts tests/cli.test.ts tests/cli-import.test.tsx"
   },
   "dependencies": {
     "ipaddr.js": "^2.5.0",

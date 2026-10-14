@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { chromium, type Request as BrowserRequest } from "playwright";
+import { LIMITS } from "../report/validate.ts";
 import { detectConsentManager, toCookieFindings } from "./collector-common.ts";
 import { assessRequest, isThirdParty, safeDestination } from "./detectors.ts";
 import {
@@ -14,7 +15,12 @@ import {
   type EgressOptions,
 } from "./egress-proxy.ts";
 import { SIGNATURE_SET_VERSION } from "./signatures.ts";
-import type { RequestFinding, ScanReport, TechnologyFinding } from "./types.ts";
+import {
+  REPORT_SCHEMA_VERSION,
+  type RequestFinding,
+  type ScanReport,
+  type TechnologyFinding,
+} from "./types.ts";
 import { UnsafeTargetError } from "./url-policy.ts";
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
@@ -146,6 +152,52 @@ function describeOutcome(raw: RawRequest): string {
   return "Outcome: not recorded.";
 }
 
+/**
+ * Evidence lines per technology are bounded: a page can contact thousands of
+ * hosts under one vendor's domain, and each distinct one would add a line. The
+ * first lines are kept and the rest are counted.
+ */
+const MAX_EVIDENCE_LINES = 50;
+const MORE_PREFIX = "And ";
+
+export function addEvidence(lines: string[], line: string): string[] {
+  const more = lines.findIndex((entry) => entry.startsWith(MORE_PREFIX));
+  const kept = more === -1 ? lines : lines.slice(0, more);
+  if (kept.includes(line)) return lines;
+  if (kept.length < MAX_EVIDENCE_LINES) {
+    return [...kept, line, ...(more === -1 ? [] : [lines[more]!])];
+  }
+  const hidden =
+    more === -1 ? 1 : Number(/^And (\d+) /.exec(lines[more]!)?.[1] ?? 0) + 1;
+  return [
+    ...kept,
+    `${MORE_PREFIX}${hidden} more similar requests are not listed.`,
+  ];
+}
+
+/**
+ * The report format bounds every value (docs/report-format.md), and the scanner
+ * writes only what it can hold: a report the importer would refuse is worse than
+ * one that says "not listed". A real DNS name is at most 253 characters; a page
+ * can still ask for a longer one.
+ */
+export function isRecordable(url: URL): boolean {
+  return url.hostname.length <= 253 && url.origin.length <= LIMITS.origin;
+}
+
+/** Keeps the cookie list within the format's bound and says how many were left out. */
+export function capCookies<T>(cookies: T[]): { kept: T[]; hidden: number } {
+  return {
+    kept: cookies.slice(0, LIMITS.cookies),
+    hidden: Math.max(0, cookies.length - LIMITS.cookies),
+  };
+}
+
+/** Time since navigation began; a clock that steps backwards must not give a negative. */
+export function elapsedMs(now: number, since: number): number {
+  return Math.max(0, now - since);
+}
+
 const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 function tryUrl(value: string): URL | undefined {
@@ -258,6 +310,10 @@ export async function scanLive(
     // Requests that match a signature are never crowded out by ordinary ones:
     // a page cannot hide a tracker behind a flood of first-party requests.
     const keep = (url: URL, resourceType: string): boolean => {
+      if (!isRecordable(url)) {
+        dropped += 1;
+        return false;
+      }
       const significant =
         assessRequest(url, resourceType).classification !== "unknown";
       if (recorded.size + sockets.length < MAX_RECORDED_REQUESTS) {
@@ -278,7 +334,7 @@ export async function scanLive(
       const raw: RawRequest = {
         url: requestUrl,
         resourceType: request.resourceType(),
-        timeMs: Date.now() - navigationStart,
+        timeMs: elapsedMs(Date.now(), navigationStart),
       };
       if (keep(requestUrl, raw.resourceType)) recorded.set(request, raw);
     });
@@ -322,7 +378,7 @@ export async function scanLive(
       const raw: RawRequest = {
         url: socketUrl,
         resourceType: "websocket",
-        timeMs: Date.now() - navigationStart,
+        timeMs: elapsedMs(Date.now(), navigationStart),
       };
       if (!keep(socketUrl, "websocket")) return;
       sockets.push(raw);
@@ -395,7 +451,11 @@ export async function scanLive(
 
     const afterUrl = tryUrl(page.url());
     const cmp = await detectConsentManager(page);
-    const cookies = toCookieFindings(await context.cookies(), loaded.hostname);
+    const allCookies = toCookieFindings(
+      await context.cookies(),
+      loaded.hostname,
+    );
+    const { kept: cookies, hidden: hiddenCookies } = capCookies(allCookies);
 
     const technologies = new Map<string, TechnologyFinding>();
     const thirdPartyRequests: RequestFinding[] = [];
@@ -424,12 +484,10 @@ export async function scanLive(
           ...detected,
           signature: assessment.signature,
           observation,
-          evidence: [
-            ...new Set([
-              ...(existing?.evidence ?? []),
-              `${assessment.reason} Destination: ${safeDestination(raw.url)}. ${describeOutcome(raw)}`,
-            ]),
-          ],
+          evidence: addEvidence(
+            existing?.evidence ?? [],
+            `${assessment.reason} Destination: ${safeDestination(raw.url)}. ${describeOutcome(raw)}`,
+          ),
         });
       }
       if (thirdParty) {
@@ -504,6 +562,10 @@ export async function scanLive(
           },
         ]
       : [];
+    if (hiddenCookies > 0)
+      limitations.push(
+        `${hiddenCookies} cookie(s) beyond the ${LIMITS.cookies}-cookie limit are not listed.`,
+      );
     if (dropped > 0)
       concerns.push({
         title: "Some requests are not listed",
@@ -512,6 +574,7 @@ export async function scanLive(
       });
 
     return {
+      schemaVersion: REPORT_SCHEMA_VERSION,
       targetUrl: loaded.origin,
       scannedAt: new Date(startedAt).toISOString(),
       status: "completed",

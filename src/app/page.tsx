@@ -30,6 +30,9 @@ export default function Home() {
                 <Link className="primary-link" href="/sample">
                   Explore a sample report <span aria-hidden="true">→</span>
                 </Link>
+                <Link className="text-link" href="/import">
+                  Open a CLI report <span aria-hidden="true">→</span>
+                </Link>
                 <a className="text-link" href="#what-we-inspect">
                   What we inspect <span aria-hidden="true">↓</span>
                 </a>

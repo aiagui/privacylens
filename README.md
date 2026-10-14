@@ -122,6 +122,16 @@ payloads, headers, URL paths or query strings. See
 [architecture](docs/architecture.md#local-cli-scanner-v010-in-development) for the
 design and its limits. Public URL scanning through the website stays disabled.
 
+### Explore a report in your browser
+
+Run `npm run dev`, open `/import`, and choose `report.json`. The website shows the
+real results with the same evidence labels and request timeline as the sample. The
+file is read inside your browser tab only: it is never uploaded, saved or sent
+anywhere, and closing the tab discards it. The format is documented in
+[report format](docs/report-format.md).
+
+![The website showing a report written by the scanner: evidence labels, the request timeline, outcomes and how the report was collected, from a synthetic local fixture.](docs/assets/import-report-desktop.png)
+
 ## Build it with us
 
 Help improve the explanations, test report accessibility, add reproducible

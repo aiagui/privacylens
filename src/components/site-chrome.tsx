@@ -26,7 +26,13 @@ export function Brand() {
     </Link>
   );
 }
-export function SiteHeader({ report = false }: { report?: boolean }) {
+export function SiteHeader({
+  report = false,
+  current,
+}: {
+  report?: boolean;
+  current?: "import";
+}) {
   return (
     <header className="header-surface">
       <div className="site-header container">
@@ -34,6 +40,12 @@ export function SiteHeader({ report = false }: { report?: boolean }) {
         <nav aria-label="Main navigation">
           <Link href={report ? "/" : "/sample"}>
             {report ? "Website inspection" : "Sample report"}
+          </Link>
+          <Link
+            href="/import"
+            aria-current={current === "import" ? "page" : undefined}
+          >
+            Open a report
           </Link>
           <a className="source-link" href={SOURCE_URL}>
             Source code <span aria-hidden="true">↗</span>
@@ -43,14 +55,21 @@ export function SiteHeader({ report = false }: { report?: boolean }) {
     </header>
   );
 }
-export function SiteFooter({ report = false }: { report?: boolean }) {
+export function SiteFooter({
+  report = false,
+  note,
+}: {
+  report?: boolean;
+  note?: string;
+}) {
   return (
     <footer className="site-footer container">
       <Brand />
       <span>
-        {report
-          ? "Bundled sample data. No live scan performed."
-          : "Follow the signals. Understand the evidence."}
+        {note ??
+          (report
+            ? "Bundled sample data. No live scan performed."
+            : "Follow the signals. Understand the evidence.")}
       </span>
       <a href={SOURCE_URL}>
         Open source · MIT <span aria-hidden="true">↗</span>

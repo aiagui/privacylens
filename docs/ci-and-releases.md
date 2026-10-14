@@ -54,13 +54,13 @@ How CI handles it, and what it deliberately does not do:
   narrow profile avoids making the exception broader than it needs to be, and
   keeps the common job unchanged.
 
-| Test                                           | Needs                                                                                     | Where it runs                                           |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `tests/sandbox.test.ts` "fail closed"          | nothing (mocked launch)                                                                   | everywhere                                              |
-| `tests/sandbox.test.ts` "real sandbox"         | unprivileged user namespaces so Chromium's sandbox starts                                 | sandbox job (required); skipped elsewhere with a notice |
-| `tests/scan-live.test.ts`, `tests/cli.test.ts` | Chromium; sandbox on where available                                                      | everywhere; with the sandbox in the sandbox job         |
-| WebRTC UDP test in `tests/scan-live.test.ts`   | loopback UDP, Chromium sending STUN; skipped with a notice if the control sees no traffic | everywhere it can                                       |
-| Memory and process-tree tests                  | POSIX `ps` (macOS, Linux); not Windows                                                    | everywhere with `ps`                                    |
+| Test                                                                        | Needs                                                                                     | Where it runs                                           |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `tests/sandbox.test.ts` "fail closed"                                       | nothing (mocked launch)                                                                   | everywhere                                              |
+| `tests/sandbox.test.ts` "real sandbox"                                      | unprivileged user namespaces so Chromium's sandbox starts                                 | sandbox job (required); skipped elsewhere with a notice |
+| `tests/scan-live.test.ts`, `tests/cli.test.ts`, `tests/cli-import.test.tsx` | Chromium; sandbox on where available                                                      | everywhere; with the sandbox in the sandbox job         |
+| WebRTC UDP test in `tests/scan-live.test.ts`                                | loopback UDP, Chromium sending STUN; skipped with a notice if the control sees no traffic | everywhere it can                                       |
+| Memory and process-tree tests                                               | POSIX `ps` (macOS, Linux); not Windows                                                    | everywhere with `ps`                                    |
 
 To run them locally: `PRIVACYLENS_REQUIRE_SANDBOX=1 npm run test:sandbox`. On a
 Linux machine with the same restriction, an AppArmor profile like the one in the

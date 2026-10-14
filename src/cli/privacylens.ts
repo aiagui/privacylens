@@ -10,6 +10,8 @@ import {
   scanLive,
 } from "../scanner/scan-live.ts";
 import type { ScanReport } from "../scanner/types.ts";
+import { isUnsafeCharacter } from "../report/text.ts";
+import { validateReport } from "../report/validate.ts";
 import { UnsafeTargetError } from "../scanner/url-policy.ts";
 
 export const EXIT = { ok: 0, failed: 1, usage: 2, refused: 3 } as const;
@@ -47,19 +49,6 @@ Setup: run "npx playwright install chromium" once.
  * file names) is stripped of control characters before it reaches a terminal:
  * escape sequences could clear the screen, retitle the window or forge lines.
  */
-function isUnsafeCharacter(code: number): boolean {
-  return (
-    code <= 0x1f || // C0 controls
-    (code >= 0x7f && code <= 0x9f) || // DEL and C1 controls
-    code === 0x2028 ||
-    code === 0x2029 ||
-    (code >= 0x200b && code <= 0x200f) || // zero-width and direction marks
-    (code >= 0x202a && code <= 0x202e) || // bidi embeddings
-    (code >= 0x2066 && code <= 0x2069) || // bidi isolates
-    code === 0xfeff
-  );
-}
-
 export function plain(text: string, max = 400): string {
   const cleaned = [...text]
     .map((character) =>
@@ -177,6 +166,18 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     return EXIT.failed;
   }
 
+  // The scanner is meant to write only what the web importer accepts. If a value
+  // slips through, say so now instead of leaving a file that fails to open later.
+  const check = validateReport(report);
+  if (!check.ok) {
+    const first = check.issues
+      .slice(0, 3)
+      .map((issue) => `${plain(issue.path, 80)} ${plain(issue.message, 120)}`)
+      .join("; ");
+    io.stderr(
+      `Warning: this report does not match the report format, so the web importer may refuse it (${first}). Please report this as a bug.\n`,
+    );
+  }
   const json = `${JSON.stringify(report, null, 2)}\n`;
   if (values.out) {
     try {
