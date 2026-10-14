@@ -16,6 +16,8 @@ SECURITY.md
 docs/architecture.md
 docs/ci-and-releases.md
 docs/development.md
+docs/proposal-isolated-scanning.md
+docs/roadmap.md
 docs/security.md
 eslint.config.mjs
 next-env.d.ts
