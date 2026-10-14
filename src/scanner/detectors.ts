@@ -14,7 +14,7 @@ const signatures: Signature[] = [
     name: "Google Analytics",
     category: "analytics",
     domains: ["google-analytics.com"],
-    path: /\/(g\/collect|collect|analytics\.js)/i,
+    path: /(?:^|\/)(?:[gjr]\/collect|collect|analytics\.js)\/?$/i,
   },
   {
     name: "Google Tag Manager",
@@ -30,7 +30,7 @@ const signatures: Signature[] = [
     name: "Meta Pixel",
     category: "advertising",
     domains: ["facebook.com", "facebook.net"],
-    path: /\/(tr|fbevents\.js)/i,
+    path: /(?:^|\/)(?:tr|fbevents\.js)\/?$/i,
   },
   {
     name: "TikTok Pixel",
@@ -41,7 +41,7 @@ const signatures: Signature[] = [
     name: "LinkedIn Insight Tag",
     category: "advertising",
     domains: ["licdn.com", "linkedin.com"],
-    path: /\/(insight|collect|px)/i,
+    path: /(?:^|\/)(?:insight(?:\.min)?\.js|collect|px)\/?$/i,
   },
   {
     name: "Microsoft Clarity",
@@ -57,7 +57,7 @@ const signatures: Signature[] = [
     name: "Matomo",
     category: "analytics",
     domains: [],
-    path: /\/(matomo\.(js|php)|piwik\.(js|php))/i,
+    path: /(?:^|\/)(?:matomo|piwik)\.(?:js|php)$/i,
   },
 ];
 
@@ -97,7 +97,9 @@ export function detectTechnology(
 
 export function isTrackingRequest(url: URL, resourceType: string): boolean {
   if (resourceType === "script") return false;
-  return /\/(g\/collect|collect|tr|events?|pixel|px|matomo\.php|piwik\.php)/i.test(
+  // Match whole trailing path segments: "/trending" or "/events/123" are
+  // ordinary pages, not collection endpoints.
+  return /(?:^|\/)(?:[gjr]\/collect|collect|tr|events?|pixel|px|matomo\.php|piwik\.php)\/?$/i.test(
     url.pathname,
   );
 }

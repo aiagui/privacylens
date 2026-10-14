@@ -9,7 +9,9 @@ current scope needs one application rather than a monorepo or microservices.
 2. `src/components/report-view.tsx` renders escaped React text and imports the
    canonical `ScanReport` contract from `src/scanner/types.ts`.
 3. `src/scanner/detectors.ts` classifies known signatures and reduces destinations
-   to origins. A requested script alone does not establish a tracking request.
+   to origins. A requested script alone does not establish a tracking request, and
+   endpoint patterns match whole trailing path segments, so ordinary pages such as
+   `/trending` or `/events/123` are never reported as collection requests.
 4. `src/scanner/scan-fixture.ts` collects browser initiation evidence from a
    caller-owned loopback HTTP fixture. External requests and redirects are blocked.
 5. `src/scanner/dev-fixtures.ts` owns fixed HTML, starts its own loopback server and

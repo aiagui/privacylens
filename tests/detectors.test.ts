@@ -36,3 +36,33 @@ describe("tracking detection", () => {
     ]);
   });
 });
+
+describe("endpoint matching uses whole path segments", () => {
+  const ordinary = [
+    "https://www.facebook.com/trending",
+    "https://www.facebook.com/events/123",
+    "https://www.google-analytics.com/collectibles",
+    "https://www.linkedin.com/pxyz",
+    "https://www.tiktok.com/events/foo",
+  ];
+  it.each(ordinary)("does not call %s a tracking request", (address) => {
+    expect(isTrackingRequest(new URL(address), "fetch")).toBe(false);
+  });
+
+  it("does not attribute ordinary pages to a vendor by path prefix", () => {
+    expect(detectTechnology(new URL(ordinary[0]!))).toBeUndefined();
+    expect(detectTechnology(new URL(ordinary[2]!))).toBeUndefined();
+    expect(detectTechnology(new URL(ordinary[3]!))).toBeUndefined();
+  });
+
+  it.each([
+    ["https://www.facebook.com/tr?id=1", "Meta Pixel"],
+    ["https://www.facebook.com/tr/", "Meta Pixel"],
+    ["https://connect.facebook.net/en_US/fbevents.js", "Meta Pixel"],
+    ["https://www.google-analytics.com/j/collect?v=1", "Google Analytics"],
+    ["https://px.ads.linkedin.com/collect?pid=1", "LinkedIn Insight Tag"],
+    ["https://stats.example.org/matomo.php?idsite=1", "Matomo"],
+  ])("still recognizes %s", (address, name) => {
+    expect(detectTechnology(new URL(address))?.name).toBe(name);
+  });
+});
