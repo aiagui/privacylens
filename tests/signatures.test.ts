@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import { assessRequest, detectTechnology } from "../src/scanner/detectors";
 import { SIGNATURE_SET_VERSION, signatures } from "../src/scanner/signatures";
 
+// JSON.stringify turns a RegExp into {}, so serialize every pattern explicitly;
+// otherwise a changed rule would not change the hash.
 function contentHash(): string {
-  const canonical = signatures.map((signature) => ({
-    ...signature,
-    path: signature.path?.source,
-    pathFlags: signature.path?.flags,
-  }));
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+  const canonical = JSON.stringify(signatures, (_key, value: unknown) =>
+    value instanceof RegExp ? `/${value.source}/${value.flags}` : value,
+  );
+  return createHash("sha256").update(canonical).digest("hex");
 }
 
 describe("signature governance", () => {
@@ -17,8 +17,8 @@ describe("signature governance", () => {
     // If this fails you changed a signature. Bump SIGNATURE_SET_VERSION in
     // src/scanner/signatures.ts, then update both values here.
     expect({ version: SIGNATURE_SET_VERSION, hash: contentHash() }).toEqual({
-      version: "2026-10-14.1",
-      hash: "409a0bcb202b0fcce65847008c31ca116bb3780a1bab65bd50a21bde25d5aeaa",
+      version: "2026-10-14.2",
+      hash: "b4d7df4f38f8ff87717492139f7666010be9a7a059cefeaf1dfc00c8cc1db7f8",
     });
   });
 
@@ -57,21 +57,45 @@ describe("signature governance", () => {
     }
   });
 
-  it("has positive and negative examples for every signature", () => {
+  it("has attributed and negative examples for every signature", () => {
     for (const signature of signatures) {
-      expect(signature.examples.positive.length).toBeGreaterThan(0);
-      expect(signature.examples.negative.length).toBeGreaterThan(0);
+      const { observed, inferred, negative } = signature.examples;
+      expect(observed.length + inferred.length).toBeGreaterThan(0);
+      expect(negative.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never claims observed without a collection rule, and says when it is unsourced", () => {
+    for (const signature of signatures) {
+      if (!signature.collection) {
+        expect(signature.examples.observed).toEqual([]);
+        expect(signature.collectionSourced).toBe(false);
+      }
+      if (signature.collectionSourced) {
+        expect(signature.sources.length).toBeGreaterThan(0);
+      }
     }
   });
 
   describe.each(signatures.map((signature) => [signature.id, signature]))(
     "%s",
     (_id, signature) => {
-      it("attributes every positive example to itself", () => {
-        for (const address of signature.examples.positive) {
-          expect(detectTechnology(new URL(address))?.name, address).toBe(
-            signature.name,
-          );
+      it("reproduces every documented example", () => {
+        for (const address of signature.examples.observed) {
+          const result = assessRequest(new URL(address), "fetch");
+          expect(result.classification, address).toBe("observed");
+          expect(result.signature?.id, address).toBe(signature.id);
+          expect(result.reason, address).toContain(signature.id);
+          // The same URL loaded as a script is never evidence of collection.
+          expect(
+            assessRequest(new URL(address), "script").classification,
+            address,
+          ).toBe("inferred");
+        }
+        for (const address of signature.examples.inferred) {
+          const result = assessRequest(new URL(address), "fetch");
+          expect(result.classification, address).toBe("inferred");
+          expect(result.signature?.id, address).toBe(signature.id);
         }
       });
 
@@ -80,7 +104,20 @@ describe("signature governance", () => {
           expect(detectTechnology(new URL(address))?.name, address).not.toBe(
             signature.name,
           );
+          expect(
+            assessRequest(new URL(address), "fetch").classification,
+            address,
+          ).toBe("unknown");
         }
+      });
+
+      it("flags an unsourced collection pattern in the reason", () => {
+        const [address] = signature.examples.observed;
+        if (!address) return;
+        const { reason } = assessRequest(new URL(address), "fetch");
+        expect(reason.includes("not yet confirmed")).toBe(
+          !signature.collectionSourced,
+        );
       });
     },
   );
@@ -108,6 +145,19 @@ describe("request assessment", () => {
     );
     expect(result.classification).toBe("inferred");
     expect(result.reason).toContain("does not show that data was sent");
+  });
+
+  it("does not call an endpoint-shaped path on a vendor without a collection rule observed", () => {
+    for (const address of [
+      "https://www.googletagmanager.com/events",
+      "https://www.googletagmanager.com/collect",
+      "https://googleads.g.doubleclick.net/collect",
+    ]) {
+      expect(
+        assessRequest(new URL(address), "fetch").classification,
+        address,
+      ).toBe("inferred");
+    }
   });
 
   it("is unknown for a vendor host at an unrecognized path", () => {

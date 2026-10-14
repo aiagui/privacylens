@@ -88,7 +88,11 @@ export function assessRequest(
     return {
       classification: "observed",
       ...reference,
-      reason: `Request to a recognized ${signature.name} collection endpoint (${signature.id}). Initiation only; payload not inspected.`,
+      reason: `Request to a recognized ${signature.name} collection endpoint (${signature.id}). Initiation only; payload not inspected.${
+        signature.collectionSourced
+          ? ""
+          : " This endpoint pattern is not yet confirmed by vendor documentation."
+      }`,
     };
   }
   return {
@@ -98,13 +102,14 @@ export function assessRequest(
   };
 }
 
+/**
+ * True only when a recognized signature's own collection rule matches and the
+ * request is not a script load. Vendor-agnostic path guesses are not evidence.
+ */
 export function isTrackingRequest(url: URL, resourceType: string): boolean {
   if (resourceType === "script") return false;
-  // Match whole trailing path segments: "/trending" or "/events/123" are
-  // ordinary pages, not collection endpoints.
-  return /(?:^|\/)(?:[gjr]\/collect|collect|tr|events?|px|(?:matomo|piwik)\.php|pixel(?:\/[^/]+)*)\/?$/i.test(
-    url.pathname,
-  );
+  const signature = matchSignature(url);
+  return signature?.collection?.test(url.pathname) ?? false;
 }
 
 export function safeDestination(url: URL): string {

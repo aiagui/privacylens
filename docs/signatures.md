@@ -13,7 +13,10 @@ Every assessed request is exactly one of:
 | `inferred` | Browser requested a recognized vendor resource, such as a script.           | That the resource sent any data        |
 | `unknown`  | No signature explains the request, or a vendor host was hit at an odd path. | That it is harmless, or that it tracks |
 
-A script request is never `observed`. A cookie is not classified by this layer.
+A script request is never `observed`, and a signature with no `collection` rule
+can never produce `observed` at all. There is no vendor-agnostic endpoint guess.
+If the `collection` pattern is not backed by a fetched source (`collectionSourced:
+false`), the reason text says so. A cookie is not classified by this layer.
 Each result carries the signature id, the signature-set version and a plain
 reason, so a reader can see why a request was classified that way.
 
@@ -25,7 +28,8 @@ reason, so a reader can see why a request was classified that way.
    yourself and record the date; the page must actually mention the host or path.
    List every claim you could not source under `unverified`. A signature with no
    sources must list unverified claims, so gaps stay visible.
-3. Add positive and negative `examples`. Negative examples should be ordinary
+3. Add `observed`, `inferred` and `negative` `examples`. Tests reproduce each one,
+   including that an `observed` URL loaded as a script is only `inferred`. Negative examples should be ordinary
    pages on the same vendor host. Tests assert both.
 4. Prefer a path rule over a bare domain wherever the domain also serves ordinary
    pages. Only domains dedicated to tooling may match on host alone.
