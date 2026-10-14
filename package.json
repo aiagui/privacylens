@@ -18,7 +18,8 @@
     "audit": "npm audit --audit-level=high",
     "check:publication": "node scripts/check-publication.mjs",
     "test:e2e": "node scripts/test-production.mjs",
-    "check": "npm run check:publication && npm run format:check && npm run lint && npm run typecheck && npm test && npm run audit && npm run build && npm run test:e2e"
+    "check": "npm run check:publication && npm run format:check && npm run lint && npm run typecheck && npm test && npm run audit && npm run build && npm run test:e2e",
+    "scan": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/cli/privacylens.ts scan"
   },
   "dependencies": {
     "ipaddr.js": "^2.5.0",

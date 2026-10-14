@@ -3,8 +3,8 @@ import {
   signatures,
   SIGNATURE_SET_VERSION,
   type Signature,
-} from "./signatures";
-import type { Classification, TechnologyFinding } from "./types";
+} from "./signatures.ts";
+import type { Classification, TechnologyFinding } from "./types.ts";
 
 export function registrableDomain(hostname: string): string {
   return getDomain(hostname) ?? hostname.replace(/^\[|\]$/g, "");

@@ -33,6 +33,46 @@ bounded evidence. They omit cookie values, URL paths/query strings, authorizatio
 headers and payloads. No database, analytics, account system or persistence is
 configured. Sample data is synthetic and targets a reserved `.example` domain.
 
+## Local CLI scanner (v0.1.0 in development)
+
+`npm run scan -- <url>` scans one website with headless Chromium on the user's own
+machine and prints a `ScanReport` as JSON. It is a separate entry point
+(`src/cli/privacylens.ts`, run with Node's built-in type stripping; relative
+imports in shared modules therefore carry `.ts` extensions). The web application
+does not import it, and `POST /api/scan` still returns 503.
+
+- **Egress filter.** `src/scanner/egress-proxy.ts` is a loopback forward proxy with
+  per-run credentials and the browser's only route to the network. It resolves
+  names itself, refuses the connection if any answer is non-public (`ip-policy.ts`:
+  loopback, private, link-local and metadata, CGNAT, multicast, unique-local,
+  IPv4-mapped and transition ranges), then connects to the exact address it
+  validated, so DNS rebinding has no gap to use. Redirects, subresources, frames,
+  beacons and WebSockets each open a checked connection. It enforces connection,
+  byte, connect and idle limits.
+- **Collector.** `src/scanner/scan-live.ts` records requests the browser starts,
+  their outcome (`completed`, `failed` or `blocked`), cookie names and attributes,
+  and consent-manager selectors, then classifies them with the existing signatures.
+  A refused request is never used as evidence about its destination. `failed`
+  means the browser reported failure; the request may still have reached the
+  server (for example a cross-origin response the browser blocked).
+- **Provenance.** Reports carry scanner, browser and signature-set versions,
+  requested and final origins, time budgets and the filter's counts, so a result
+  can be reproduced and interpreted.
+- **Reproducible tests.** Real Chromium scans a hostile fixture page that tries
+  fetch, images, iframes, beacons, WebSockets, IPv6 and metadata addresses and
+  redirects; the test counts raw TCP connections to an internal server and requires
+  zero. Proxy tests drive raw sockets for rebinding, mixed DNS answers, malformed
+  requests and limits. The CLI is tested as a real process.
+
+Limits. This is a convenience safeguard for people scanning sites they choose on
+their own machine. It is **not** infrastructure isolation: a flaw in the proxy,
+the browser or the operating system could defeat it, and a compromised browser
+shares the user's machine. The command line accepts no option to allow private
+addresses; only the library API used by tests can. It does not yet cover consent
+interaction, and one headless visit can differ from what a real visitor sees.
+Not verified: WebRTC and QUIC are disabled by browser flags but have no dedicated
+test; behavior on Windows and behind a corporate proxy is untested.
+
 ## Decision: keep live scanning disabled
 
 Application-level DNS and IP validation cannot prevent all SSRF or DNS rebinding.

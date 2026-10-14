@@ -29,6 +29,28 @@ export interface RequestFinding {
   resourceType: string;
   /** Whether this destination is a recognized collection endpoint, resource, or unexplained. */
   classification?: Classification;
+  /** What the browser reported for this request; absent on sample and fixture data. */
+  outcome?: "completed" | "failed" | "blocked";
+}
+
+export interface ScanProvenance {
+  mode: "local-cli";
+  scanner: { name: string; version: string };
+  browser: { name: "chromium"; version: string };
+  /** Origins only: paths and queries are never recorded. */
+  requestedOrigin: string;
+  finalOrigin: string;
+  durationMs: number;
+  settleMs: number;
+  timeoutMs: number;
+  /** Requests beyond the recording cap; they were not listed individually. */
+  droppedRequests: number;
+  egress: {
+    allowedConnections: number;
+    blockedConnections: number;
+    /** Hostname and port only. */
+    blockedDestinations: { host: string; port: number; reason: string }[];
+  };
 }
 
 export interface ScanReport {
@@ -42,4 +64,6 @@ export interface ScanReport {
   concerns: { title: string; detail: string; level: "info" | "attention" }[];
   limitations: string[];
   signatureSetVersion?: string;
+  /** Present on live scans: how and with what the evidence was collected. */
+  provenance?: ScanProvenance;
 }

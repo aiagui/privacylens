@@ -102,6 +102,25 @@ For fixture development, verification commands and the project map, see
 [the development guide](docs/development.md). The development server stays on
 loopback; public scanning remains disabled.
 
+## Scan a website on your machine
+
+The local scanner is in development for v0.1.0 and is not released. With the
+setup above and Chromium installed (`npx playwright install chromium`):
+
+```sh
+npm run scan -- https://example.org --out report.json
+```
+
+It visits the page once in headless Chromium, waits a few seconds for delayed
+requests and writes an evidence report as JSON. Nothing on the page is clicked.
+All browser traffic goes through a local filter that refuses private, local and
+cloud-metadata addresses, so a page cannot reach your own network. The report
+holds origins, cookie names and attributes, and timing, and records each request
+as `observed`, `inferred` or `unknown`. It does not hold cookie values, request
+payloads, headers, URL paths or query strings. See
+[architecture](docs/architecture.md#local-cli-scanner-v010-in-development) for the
+design and its limits. Public URL scanning through the website stays disabled.
+
 ## Build it with us
 
 Help improve the explanations, test report accessibility, add reproducible

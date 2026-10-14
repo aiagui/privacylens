@@ -1,4 +1,4 @@
-import type { TechnologyFinding } from "./types";
+import type { TechnologyFinding } from "./types.ts";
 
 /**
  * Bump whenever any signature below changes. tests/signatures.test.ts pins a
