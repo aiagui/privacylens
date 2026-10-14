@@ -27,7 +27,7 @@ into something people can explore, understand and question.
 ## Explore PrivacyLens
 
 The current web experience pairs an introduction to privacy inspection with a
-detailed, evidence-led report with an animated optical header and interactive
+detailed, evidence-led report with a Simple and a Technical view, a quiet optical header and interactive
 request timing view. These are real screenshots of the application
 running locally, using synthetic example data.
 
