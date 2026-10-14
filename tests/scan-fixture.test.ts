@@ -44,6 +44,19 @@ const server = createServer((request, response) => {
     response.end("synthetic server error");
     return;
   }
+  if (request.url === "/ordinary-pages") {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end(`<!doctype html><title>Ordinary</title><script>
+      for (const url of [
+        "https://www.facebook.com/trending",
+        "https://www.facebook.com/events/123",
+        "https://www.google-analytics.com/collectibles",
+        "https://www.linkedin.com/pxyz",
+        "https://www.tiktok.com/events/foo",
+      ]) fetch(url).catch(() => {});
+    </script>`);
+    return;
+  }
   if (request.url === "/script-only") {
     response.writeHead(200, { "Content-Type": "text/html" });
     response.end(
@@ -92,6 +105,25 @@ describe("browser fixture scan", () => {
       ]),
     );
     expect(report.concerns).toEqual([]);
+  }, 20_000);
+
+  it("does not raise a tracking concern for ordinary third-party requests", async () => {
+    const report = await scanFixture(`${origin}/ordinary-pages`, origin);
+    expect(report.thirdPartyRequests.length).toBeGreaterThanOrEqual(5);
+    expect(report.concerns).toEqual([]);
+    expect(
+      report.technologies.filter((tech) => tech.observation === "observed"),
+    ).toEqual([]);
+  }, 20_000);
+
+  it("still raises the concern for a genuine collection request", async () => {
+    const report = await scanFixture(origin, origin);
+    expect(report.concerns).toEqual([
+      expect.objectContaining({
+        title: "Tracking before interaction",
+        level: "attention",
+      }),
+    ]);
   }, 20_000);
 
   it("records pre-interaction evidence without leaking cookie values or query strings", async () => {
