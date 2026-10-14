@@ -1,14 +1,17 @@
 import { createSocket, type Socket as UdpSocket } from "node:dgram";
 import { createServer, type Server } from "node:http";
+import { createServer as createTcpServer } from "node:net";
 import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   BROWSER_ARGS,
+  ScanLimitError,
   scanLive,
   parseTargetUrl,
   redactUrls,
 } from "../src/scanner/scan-live";
 import { UnsafeTargetError } from "../src/scanner/url-policy";
+import { browserTree, listProcesses } from "../src/scanner/browser-process";
 import type { EgressOptions } from "../src/scanner/egress-proxy";
 
 /**
@@ -24,6 +27,9 @@ let publicPort = 0;
 let internalPort = 0;
 let internalConnections = 0;
 let internalRequests = 0;
+let closedPort = 0;
+/** Whether this machine can start Chromium with its process sandbox. */
+let sandboxOK = true;
 
 const NAMES = [
   "site.example",
@@ -33,13 +39,14 @@ const NAMES = [
   "www.googletagmanager.com",
   "metadata.example",
   "stats.example",
+  "dead.example",
 ];
 
 function egress(): EgressOptions {
   return {
     policy: {
       allowAddress: (address, port) =>
-        address === "127.0.0.1" && port === publicPort,
+        address === "127.0.0.1" && (port === publicPort || port === closedPort),
     },
     resolve: async (host) =>
       NAMES.includes(host) || host === "127.0.0.1"
@@ -53,6 +60,22 @@ function page(body: string) {
 }
 
 beforeAll(async () => {
+  const probe = createTcpServer();
+  await new Promise<void>((done) => probe.listen(0, "127.0.0.1", done));
+  closedPort = (probe.address() as { port: number }).port;
+  await new Promise((done) => probe.close(done));
+  try {
+    const trial = await chromium.launch({
+      headless: true,
+      chromiumSandbox: true,
+    });
+    await trial.close();
+  } catch {
+    sandboxOK = false;
+    console.warn(
+      "Chromium sandbox cannot start here; scanner tests run without it",
+    );
+  }
   internalServer = createServer((_req, res) => {
     internalRequests += 1;
     res.end("internal-secret");
@@ -127,14 +150,14 @@ beforeAll(async () => {
       res.writeHead(200, { "content-type": "text/html" });
       res.end(
         page(
-          `<script>fetch("http://stats.example:${publicPort}/nocors/matomo.php").catch(() => {});</script>`,
+          `<script>fetch("http://stats.example:${publicPort}/nocors/matomo.php?idsite=1").catch(() => {});</script>`,
         ),
       );
     } else if (path === "/spoof") {
       res.writeHead(200, { "content-type": "text/html" });
       res.end(
         page(
-          `<script>fetch("http://stats.example:${publicPort}/spoof/matomo.php", { mode: "no-cors" }).catch(() => {});</script>`,
+          `<script>fetch("http://stats.example:${publicPort}/spoof/matomo.php?idsite=1", { mode: "no-cors" }).catch(() => {});</script>`,
         ),
       );
     } else if (path === "/spoof/matomo.php") {
@@ -157,6 +180,82 @@ beforeAll(async () => {
           })().catch(() => {});
         </script>`),
       );
+    } else if (path === "/memory") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(
+          `<script>const hold = []; setInterval(() => { hold.push(new Uint8Array(64 * 1024 * 1024).fill(1)); }, 40);</script>`,
+        ),
+      );
+    } else if (path === "/endless") {
+      res.writeHead(200, { "content-type": "text/plain" });
+      const timer = setInterval(() => res.write(Buffer.alloc(65536, 97)), 2);
+      res.on("close", () => clearInterval(timer));
+    } else if (path === "/download") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(
+          `<script>fetch("http://cdn.example:${publicPort}/endless", { mode: "no-cors" }).catch(() => {});</script>`,
+        ),
+      );
+    } else if (path === "/jsnav") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(`<script>
+          fetch("http://stats.example:${publicPort}/matomo.php?idsite=1", { mode: "no-cors" }).catch(() => {});
+          setTimeout(() => location.replace("http://stats.example:${publicPort}/landing"), 400);
+        </script>`),
+      );
+    } else if (path === "/landing") {
+      res
+        .writeHead(200, { "content-type": "text/html" })
+        .end(page("<p>landing</p>"));
+    } else if (path === "/blank") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(`<script>
+          fetch("http://stats.example:${publicPort}/matomo.php?idsite=1", { mode: "no-cors" }).catch(() => {});
+          setTimeout(() => location.replace("about:blank"), 400);
+        </script>`),
+      );
+    } else if (path === "/ok-first-party") {
+      res.writeHead(204).end();
+    } else if (path === "/flood") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(`<script>
+          (async () => {
+            for (let i = 0; i < 600; i++) fetch("/ok-first-party?i=" + i).catch(() => {});
+            await new Promise((r) => setTimeout(r, 300));
+            fetch("http://stats.example:${publicPort}/matomo.php?idsite=1", { mode: "no-cors" }).catch(() => {});
+          })();
+        </script>`),
+      );
+    } else if (path === "/hsts") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(
+          `<script>fetch("http://www.google-analytics.com:${publicPort}/g/collect?v=2", { mode: "no-cors" }).catch(() => {});</script>`,
+        ),
+      );
+    } else if (path === "/failures") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        page(`<script>
+          fetch("http://dead.example:${closedPort}/matomo.php?idsite=1", { mode: "no-cors" }).catch(() => {});
+          fetch("http://nowhere.example:${publicPort}/matomo.php?idsite=1", { mode: "no-cors" }).catch(() => {});
+        </script>`),
+      );
+    } else if (path === "/cmpspoof") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(
+        `<!doctype html><title>x</title><script>
+          const boom = () => { throw new Error("\u001b[2J\u001b]0;pwned\u0007 forged line"); };
+          Document.prototype.querySelector = boom;
+          Document.prototype.querySelectorAll = () => [{}];
+          Element.prototype.querySelector = () => ({});
+        </script><p>no banner here</p>`,
+      );
     } else if (path === "/missing") {
       res.writeHead(404).end("nope");
     } else {
@@ -174,7 +273,12 @@ afterAll(async () => {
   await new Promise((done) => internalServer.close(done));
 });
 
-const options = () => ({ egress: egress(), settleMs: 800, timeoutMs: 25_000 });
+const options = () => ({
+  egress: egress(),
+  settleMs: 800,
+  timeoutMs: 25_000,
+  chromiumSandbox: sandboxOK,
+});
 
 describe("scanLive default egress policy", () => {
   it("refuses a loopback target without contacting it", async () => {
@@ -463,4 +567,226 @@ describe("WebRTC stays closed", () => {
     });
     expect(datagrams).toBe(0);
   }, 40_000);
+});
+
+describe("browser sandbox", () => {
+  it("is enabled by default and recorded in the report", async () => {
+    // No explicit chromiumSandbox: this exercises the default itself.
+    const report = await scanLive(`http://site.example:${publicPort}/`, {
+      ...options(),
+      chromiumSandbox: undefined,
+    });
+    expect(report.provenance?.browser.sandbox).toBe(sandboxOK);
+    if (sandboxOK) {
+      expect(report.limitations.join(" ")).not.toMatch(/sandbox was disabled/);
+    }
+  }, 30_000);
+
+  it("says so in the report when the sandbox is switched off", async () => {
+    const report = await scanLive(`http://site.example:${publicPort}/`, {
+      ...options(),
+      chromiumSandbox: false,
+    });
+    expect(report.provenance?.browser.sandbox).toBe(false);
+    expect(report.limitations.join(" ")).toMatch(/sandbox was disabled/);
+  }, 30_000);
+
+  it("launches Chromium processes without --no-sandbox when the sandbox is on", async (context) => {
+    if (!sandboxOK) return context.skip();
+    const run = async (sandbox: boolean) => {
+      const marker = `privacylens-run-test-${Math.random().toString(16).slice(2)}`;
+      const browser = await chromium.launch({
+        headless: true,
+        chromiumSandbox: sandbox,
+        args: [`--privacylens-run=${marker}`],
+      });
+      try {
+        await (await browser.newPage()).goto("about:blank");
+        return (await browserTree(marker)).map((proc) => proc.args);
+      } finally {
+        await browser.close();
+      }
+    };
+    expect(
+      (await run(true)).some((args) => args.includes("--no-sandbox")),
+    ).toBe(false);
+    // Control: Playwright does add the flag when the sandbox is off.
+    expect(
+      (await run(false)).some((args) => args.includes("--no-sandbox")),
+    ).toBe(true);
+  }, 40_000);
+});
+
+describe("resource limits and cleanup", () => {
+  const leftovers = async () => {
+    await new Promise((done) => setTimeout(done, 1500));
+    return (await listProcesses()).filter(
+      (proc) =>
+        proc.pid !== process.pid &&
+        // A leftover would be a Chromium binary carrying the run marker.
+        /^\/\S*(?:chrom|headless)/i.test(proc.args) &&
+        proc.args.includes("--privacylens-run=privacylens-run-"),
+    );
+  };
+
+  it("stops a page that allocates memory without bound, and leaves no process behind", async () => {
+    const started = Date.now();
+    const error = await scanLive(`http://site.example:${publicPort}/memory`, {
+      ...options(),
+      timeoutMs: 40_000,
+      settleMs: 30_000,
+      maxMemoryBytes: 1024 * 1024 * 1024,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ScanLimitError);
+    expect((error as Error).message).toMatch(/memory/);
+    expect(Date.now() - started).toBeLessThan(30_000);
+    expect(await leftovers()).toEqual([]);
+  }, 60_000);
+
+  it("stops a page that downloads without bound, and leaves no process behind", async () => {
+    const started = Date.now();
+    const error = await scanLive(`http://site.example:${publicPort}/download`, {
+      ...options(),
+      timeoutMs: 40_000,
+      settleMs: 30_000,
+      egress: { ...egress(), limits: { maxTotalBytes: 2 * 1024 * 1024 } },
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ScanLimitError);
+    expect((error as Error).message).toMatch(/downloaded more data/);
+    expect(Date.now() - started).toBeLessThan(30_000);
+    expect(await leftovers()).toEqual([]);
+  }, 60_000);
+
+  it("rejects a settle time that leaves no room to load the page", async () => {
+    await expect(
+      scanLive(`http://site.example:${publicPort}/`, {
+        ...options(),
+        timeoutMs: 5_000,
+        settleMs: 4_500,
+      }),
+    ).rejects.toThrow(RangeError);
+  });
+
+  it("leaves no process behind after a normal scan", async () => {
+    await scanLive(`http://site.example:${publicPort}/`, options());
+    expect(await leftovers()).toEqual([]);
+  }, 30_000);
+});
+
+describe("evidence accuracy under adversarial pages", () => {
+  it("judges first party by the page the server delivered, not where script navigates", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/jsnav`,
+      options(),
+    );
+    expect(report.targetUrl).toBe(`http://site.example:${publicPort}`);
+    expect(report.provenance?.finalOrigin).toBe(
+      `http://site.example:${publicPort}`,
+    );
+    expect(report.technologies.find((t) => t.name === "Matomo")).toMatchObject({
+      observation: "observed",
+    });
+    expect(report.concerns.map((c) => c.title)).toContain(
+      "Tracking before interaction",
+    );
+    expect(report.limitations.join(" ")).toMatch(
+      /navigated to a different address after loading/,
+    );
+  }, 30_000);
+
+  it("never reports a non-web final address as the target", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/blank`,
+      options(),
+    );
+    expect(report.targetUrl).toBe(`http://site.example:${publicPort}`);
+    expect(JSON.stringify(report)).not.toContain('"null"');
+    expect(report.limitations.join(" ")).toMatch(/non-web address/);
+    expect(report.concerns.map((c) => c.title)).toContain(
+      "Tracking before interaction",
+    );
+  }, 30_000);
+
+  it("cannot hide a tracker behind a flood of ordinary requests", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/flood`,
+      options(),
+    );
+    expect(report.provenance?.droppedRequests).toBeGreaterThan(0);
+    expect(report.technologies.find((t) => t.name === "Matomo")).toMatchObject({
+      observation: "observed",
+    });
+    const titles = report.concerns.map((c) => c.title);
+    expect(titles).toContain("Tracking before interaction");
+    expect(titles).toContain("Some requests are not listed");
+  }, 40_000);
+
+  it("does not report Chromium's synthetic HSTS redirect as a completed request", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/hsts`,
+      options(),
+    );
+    const evidence =
+      report.technologies
+        .find((t) => t.name === "Google Analytics")
+        ?.evidence.join(" ") ?? "";
+    expect(evidence).not.toMatch(/HTTP 307/);
+    for (const request of report.thirdPartyRequests.filter(
+      (r) => r.domain === "www.google-analytics.com",
+    )) {
+      expect(request.outcome).not.toBe("completed");
+    }
+  }, 30_000);
+
+  it("labels DNS and connection failures as failed, never as refused for safety", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/failures`,
+      options(),
+    );
+    const requests = report.thirdPartyRequests.filter((r) =>
+      ["dead.example", "nowhere.example"].includes(r.domain),
+    );
+    expect(requests.length).toBe(2);
+    for (const request of requests) {
+      expect(request.outcome, request.domain).toBe("failed");
+      expect(request.classification, request.domain).toBe("observed");
+    }
+    expect(report.provenance?.egress.blockedConnections).toBe(0);
+    expect(report.provenance?.egress.failedConnections).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(report.limitations.join(" ")).toMatch(
+      /failed because a name did not resolve/,
+    );
+  }, 30_000);
+
+  it("cannot be made to forge or break consent-manager detection", async () => {
+    const report = await scanLive(
+      `http://site.example:${publicPort}/cmpspoof`,
+      options(),
+    );
+    expect(report.cmp).toEqual({ detected: false });
+    expect(JSON.stringify(report)).not.toMatch(/forged|pwned|\\u001b/);
+  }, 30_000);
+});
+
+describe("redaction edge cases", () => {
+  it("does not stop at punctuation inside a URL", () => {
+    for (const text of [
+      "failed at http://site.example:6000/a)b?token=SECRETINURL",
+      "failed at http://site.example:6000/it's?token=SECRETINURL now",
+      `failed at "http://site.example:6000/q"x?token=SECRETINURL"`,
+    ]) {
+      const out = redactUrls(text);
+      expect(out, text).not.toContain("SECRETINURL");
+      expect(out, text).toContain("http://site.example:6000");
+    }
+  });
+
+  it("redacts data, blob and javascript URLs entirely", () => {
+    const out = redactUrls(
+      "see data:text/html,<b>secret</b> and javascript:alert(1) and blob:https://a.test/uuid-1",
+    );
+    expect(out).not.toMatch(/secret|alert|uuid-1/);
+  });
 });

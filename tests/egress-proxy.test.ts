@@ -204,16 +204,35 @@ describe("egress proxy address policy", () => {
     expect(calls).toEqual([]);
   });
 
-  it("refuses unresolvable names", async () => {
+  it("reports an unresolvable name as a failure, not a safety refusal", async () => {
     const p = await start({ resolve: resolver({}) });
-    expect(
-      status(await raw(p, connectRequest(p, "nowhere.test:443"))),
-    ).toContain("403");
-    expect(p.stats().blockedDestinations[0]).toEqual({
-      host: "nowhere.test",
-      port: 443,
-      reason: "unresolvable",
+    const answer = await raw(p, connectRequest(p, "nowhere.test:443"));
+    expect(status(answer)).toContain("502");
+    expect(answer.toLowerCase()).toContain(
+      `x-privacylens-blocked: ${p.blockMarker}:failed`,
+    );
+    const stats = p.stats();
+    expect(stats.failedConnections).toBe(1);
+    expect(stats.blockedConnections).toBe(0);
+    expect(stats.blockedDestinations).toEqual([]);
+    expect(p.wasBlocked("nowhere.test", 443)).toBe(false);
+    expect(p.blockReason("nowhere.test", 443)).toBe("unresolvable");
+  });
+
+  it("reports a refused connection as a failure, not a safety refusal", async () => {
+    const closed = createTcpServer();
+    await new Promise<void>((done) => closed.listen(0, "127.0.0.1", done));
+    const port = (closed.address() as { port: number }).port;
+    await new Promise((done) => closed.close(done));
+    const p = await start({
+      policy: { allowAddress: () => true },
+      resolve: resolver({ "down.test": ["127.0.0.1"] }),
     });
+    const answer = await raw(p, connectRequest(p, `down.test:${port}`));
+    expect(status(answer)).toContain("502");
+    expect(p.stats().blockedConnections).toBe(0);
+    expect(p.stats().failedConnections).toBe(1);
+    expect(p.blockReason("down.test", port)).toBe("connect-failed");
   });
 
   it("defeats DNS rebinding by connecting to the exact address it validated", async () => {
@@ -341,6 +360,56 @@ describe("egress proxy hardening from the security audit", () => {
     expect(stats.blockedDestinations).toHaveLength(100);
     expect(stats.blockedDestinationsTruncated).toBe(true);
   }, 30_000);
+});
+
+describe("egress proxy budgets", () => {
+  it("asks for identity encoding on plain HTTP so the byte budget counts real bytes", async () => {
+    let seen: string | undefined = "unset";
+    const origin = createServer((req, res) => {
+      seen = req.headers["accept-encoding"];
+      res.writeHead(200).end("ok");
+    });
+    servers.push(origin);
+    await new Promise<void>((done) => origin.listen(0, "127.0.0.1", done));
+    const port = (origin.address() as { port: number }).port;
+    const p = await start({
+      policy: {
+        allowAddress: (a, port2) => a === "127.0.0.1" && port2 === port,
+      },
+      resolve: resolver({ "site.test": ["127.0.0.1"] }),
+    });
+    await raw(
+      p,
+      `GET http://site.test:${port}/ HTTP/1.1\r\nHost: site.test:${port}\r\nAccept-Encoding: gzip, br\r\nProxy-Authorization: ${auth(p)}\r\nConnection: close\r\n\r\n`,
+    );
+    expect(seen).toBeUndefined();
+  });
+
+  it("signals once when the download budget is exhausted", async () => {
+    const flood = createTcpServer((socket: Socket) => {
+      const timer = setInterval(() => socket.write(Buffer.alloc(8192)), 2);
+      socket.on("close", () => clearInterval(timer));
+      socket.on("error", () => undefined);
+    });
+    servers.push(flood);
+    await new Promise<void>((done) => flood.listen(0, "127.0.0.1", done));
+    const port = (flood.address() as { port: number }).port;
+    const onBudgetExceeded = vi.fn();
+    const p = await start({
+      policy: { allowAddress: () => true },
+      resolve: resolver({ "flood.test": ["127.0.0.1"] }),
+      limits: { maxTotalBytes: 64 * 1024 },
+      onBudgetExceeded,
+    });
+    await new Promise<void>((done) => {
+      const socket = connect(p.port, "127.0.0.1");
+      socket.on("close", () => done());
+      socket.on("data", () => undefined);
+      socket.write(connectRequest(p, `flood.test:${port}`));
+      setTimeout(done, 4000);
+    });
+    expect(onBudgetExceeded).toHaveBeenCalledTimes(1);
+  }, 10_000);
 });
 
 describe("egress proxy forwarding", () => {

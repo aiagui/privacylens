@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assessRequest,
   detectTechnology,
   isThirdParty,
   isTrackingRequest,
@@ -87,5 +88,73 @@ describe("endpoint matching uses whole path segments", () => {
     ["https://analytics.google.com/g/collect?v=2", "Google Analytics"],
   ])("still recognizes %s", (address, name) => {
     expect(detectTechnology(new URL(address))?.name).toBe(name);
+  });
+});
+
+describe("matching hardening from the security audit", () => {
+  it("treats a trailing-dot hostname as the same host", () => {
+    const url = new URL("https://c.clarity.ms./collect");
+    expect(detectTechnology(url)?.name).toBe("Microsoft Clarity");
+    expect(assessRequest(url, "fetch").classification).toBe("observed");
+  });
+
+  it("matches the decoded path so percent-escapes cannot hide an endpoint", () => {
+    const url = new URL("https://www.google-analytics.com/g/%63ollect?v=2");
+    expect(assessRequest(url, "fetch").classification).toBe("observed");
+    expect(
+      assessRequest(
+        new URL("https://www.google-analytics.com/%E0%A4%A"),
+        "fetch",
+      ).classification,
+    ).not.toBe("observed");
+  });
+
+  it("does not call a tiktok.com web page a pixel", () => {
+    expect(
+      detectTechnology(new URL("https://www.tiktok.com/discover/pixel")),
+    ).toBeUndefined();
+    expect(
+      detectTechnology(new URL("https://analytics.tiktok.com/api/v2/pixel"))
+        ?.name,
+    ).toBe("TikTok Pixel");
+  });
+
+  it("requires idsite for a Matomo request to be observed", () => {
+    expect(
+      assessRequest(
+        new URL("https://stats.example.org/matomo.php?idsite=3&rec=1"),
+        "fetch",
+      ).classification,
+    ).toBe("observed");
+    for (const address of [
+      "https://stats.example.org/matomo.php",
+      "https://stats.example.org/matomo.php?rec=1",
+      "https://stats.example.org/matomo.php?siteid=3",
+    ]) {
+      expect(
+        assessRequest(new URL(address), "fetch").classification,
+        address,
+      ).toBe("inferred");
+    }
+  });
+
+  it.each([
+    ["alice.github.io", "bob.github.io"],
+    ["a.vercel.app", "b.vercel.app"],
+    ["x.blogspot.com", "y.blogspot.com"],
+    ["a.herokuapp.com", "b.herokuapp.com"],
+    ["a.pages.dev", "b.pages.dev"],
+  ])(
+    "treats tenants %s and %s of a shared platform as different parties",
+    (a, b) => {
+      expect(isThirdParty(a, b)).toBe(true);
+    },
+  );
+
+  it("still groups subdomains of one tenant", () => {
+    expect(isThirdParty("www.alice.github.io", "cdn.alice.github.io")).toBe(
+      false,
+    );
+    expect(isThirdParty("shop.example.co.uk", "cdn.example.co.uk")).toBe(false);
   });
 });

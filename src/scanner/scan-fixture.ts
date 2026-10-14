@@ -128,7 +128,7 @@ export async function scanFixture(
     }
     await page.waitForTimeout(500);
 
-    const cmp = await page.evaluate(detectConsentManager);
+    const cmp = await detectConsentManager(page);
     const cookies = toCookieFindings(await context.cookies(), url.hostname);
 
     return {

@@ -114,7 +114,8 @@ npm run scan -- https://example.org --out report.json
 It visits the page once in headless Chromium, waits a few seconds for delayed
 requests and writes an evidence report as JSON. Nothing on the page is clicked.
 All browser traffic goes through a local filter that refuses private, local and
-cloud-metadata addresses, so a page cannot reach your own network. The report
+cloud-metadata addresses, so a page cannot reach your own network, and Chromium
+runs with its sandbox on and with memory, download and time limits. The report
 holds origins, cookie names and attributes, and timing, and records each request
 as `observed`, `inferred` or `unknown`. It does not hold cookie values, request
 payloads, headers, URL paths or query strings. See

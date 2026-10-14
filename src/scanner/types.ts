@@ -36,7 +36,12 @@ export interface RequestFinding {
 export interface ScanProvenance {
   mode: "local-cli";
   scanner: { name: string; version: string };
-  browser: { name: "chromium"; version: string };
+  browser: {
+    name: "chromium";
+    version: string;
+    /** Whether Chromium's own process sandbox was enabled for this scan. */
+    sandbox: boolean;
+  };
   /** Origins only: paths and queries are never recorded. */
   requestedOrigin: string;
   finalOrigin: string;
@@ -50,6 +55,8 @@ export interface ScanProvenance {
     blockedConnections: number;
     /** Connections turned away only because a resource limit was reached. */
     limitRefusals: number;
+    /** Destinations that did not resolve or refused the connection. */
+    failedConnections: number;
     /** True when more refusals happened than blockedDestinations lists. */
     blockedDestinationsTruncated: boolean;
     /** Hostname and port only. */

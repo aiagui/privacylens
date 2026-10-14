@@ -52,6 +52,7 @@ src/components/request-journey.tsx
 src/components/site-chrome.tsx
 src/proxy.ts
 src/sample-report.ts
+src/scanner/browser-process.ts
 src/scanner/collector-common.ts
 src/scanner/detectors.ts
 src/scanner/dev-fixtures.ts
@@ -63,6 +64,7 @@ src/scanner/signatures.ts
 src/scanner/types.ts
 src/scanner/url-policy.ts
 tests/cli.test.ts
+tests/cookie-names.test.ts
 tests/detectors.test.ts
 tests/dev-fixture-registry.test.ts
 tests/dev-scan-fixture-route.test.ts

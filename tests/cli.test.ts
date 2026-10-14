@@ -9,7 +9,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { EXIT, runCli } from "../src/cli/privacylens";
+import { EXIT, plain, runCli } from "../src/cli/privacylens";
+import { ScanLimitError } from "../src/scanner/scan-live";
 import { SAMPLE_REPORT } from "../src/sample-report";
 import { UnsafeTargetError } from "../src/scanner/url-policy";
 
@@ -206,4 +207,89 @@ describe("cli process", () => {
     expect(result.stdout).toBe("");
     expect(result.stderr).not.toMatch(/SECRET123|token=|\/internal\/path/);
   }, 70_000);
+});
+
+describe("cli terminal safety and validation", () => {
+  it("strips escape sequences and other control characters from anything it prints", () => {
+    const hostile =
+      "\u001b[2J\u001b]0;pwned\u0007 line\nReport written to /tmp/ok.json \u202e evil \u0085 \u200b";
+    const out = plain(hostile);
+    for (const code of [0x1b, 0x07, 0x0a, 0x85, 0x202e, 0x200b])
+      expect(
+        out.includes(String.fromCodePoint(code)),
+        `U+${code.toString(16)}`,
+      ).toBe(false);
+    expect(plain("x".repeat(1000)).length).toBeLessThanOrEqual(403);
+  });
+
+  it("never lets scanner error text inject terminal sequences or forge lines", async () => {
+    const h = harness(async () => {
+      throw new Error(
+        "boom \u001b[2J\u001b]0;pwned\u0007\nReport written to /tmp/ok.json",
+      );
+    });
+    expect(await runCli(["scan", "https://example.com"], h.io)).toBe(
+      EXIT.failed,
+    );
+    const text = h.err.join("");
+    expect(text).not.toContain("\u001b");
+    expect(text).not.toContain("\u0007");
+    // One progress line plus one error line: the forged line did not become its own line.
+    expect(text.trim().split("\n")).toHaveLength(2);
+  });
+
+  it("reports a limit stop as stopped, not as a generic failure", async () => {
+    const h = harness(async () => {
+      throw new ScanLimitError(
+        "The page used more memory than the scan allows, so the scan was stopped",
+      );
+    });
+    expect(await runCli(["scan", "https://example.com"], h.io)).toBe(
+      EXIT.failed,
+    );
+    expect(h.err.join("")).toContain("Stopped: The page used more memory");
+  });
+
+  it.each([
+    [["scan", "https://example.com", "--timeout", "5", "--settle", "4"]],
+    [["scan", "https://example.com", "--timeout", "10", "--settle", "9"]],
+    [["scan", "https://example.com", "--out", ""]],
+    [["scan", "https://example.com", "--out", "  "]],
+  ])("rejects %j as a usage error without scanning", async (argv) => {
+    let scanned = false;
+    const h = harness(async () => {
+      scanned = true;
+      return SAMPLE_REPORT;
+    });
+    expect(await runCli(argv, h.io)).toBe(EXIT.usage);
+    expect(scanned).toBe(false);
+  });
+
+  it("keeps the browser sandbox on unless explicitly told otherwise", async () => {
+    const seen: Array<boolean | undefined> = [];
+    const h = harness(async (_url, options) => {
+      seen.push(options?.chromiumSandbox);
+      return SAMPLE_REPORT;
+    });
+    await runCli(["scan", "https://example.com"], h.io);
+    const unsafe = harness(async (_url, options) => {
+      seen.push(options?.chromiumSandbox);
+      return SAMPLE_REPORT;
+    });
+    await runCli(
+      ["scan", "https://example.com", "--unsafe-no-sandbox"],
+      unsafe.io,
+    );
+    expect(seen).toEqual([true, false]);
+    expect(h.err.join("")).not.toMatch(/sandbox is disabled/);
+    expect(unsafe.err.join("")).toMatch(/sandbox is disabled/);
+  });
+
+  it("does not claim Chromium is missing for unrelated launch errors", async () => {
+    const h = harness(async () => {
+      throw new Error("browserType.launch: Target page crashed");
+    });
+    await runCli(["scan", "https://example.com"], h.io);
+    expect(h.err.join("")).not.toContain("npx playwright install");
+  });
 });

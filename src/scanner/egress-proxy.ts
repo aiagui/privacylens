@@ -22,8 +22,19 @@ export interface EgressLimits {
   idleTimeoutMs: number;
 }
 
-/** Policy refusals. Resource limits are reported separately, never as these. */
-export type BlockReason = "non-public-address" | "unresolvable" | "bad-request";
+/**
+ * Why a destination was not reached. Only "non-public-address" and
+ * "bad-request" are safety refusals (outcome `blocked`); a name that does not
+ * resolve or a host that refuses the connection is an ordinary failure.
+ * Resource limits are reported separately and never appear here.
+ */
+export type BlockReason =
+  "non-public-address" | "bad-request" | "unresolvable" | "connect-failed";
+
+const POLICY_REASONS: ReadonlySet<BlockReason> = new Set([
+  "non-public-address",
+  "bad-request",
+]);
 
 export interface BlockedDestination {
   host: string;
@@ -38,6 +49,8 @@ export interface EgressOptions {
   /** Injectable for tests; defaults to net.connect. */
   connect?: typeof netConnect;
   limits?: Partial<EgressLimits>;
+  /** Called once when the total download budget is exhausted. */
+  onBudgetExceeded?: () => void;
 }
 
 export const DEFAULT_EGRESS_LIMITS: EgressLimits = {
@@ -51,6 +64,8 @@ export const DEFAULT_EGRESS_LIMITS: EgressLimits = {
 export const BLOCKED_HEADER = "x-privacylens-blocked";
 
 const MAX_RECORDED_BLOCKS = 100;
+/** Bound on remembered destinations so a page cannot grow memory without limit. */
+const MAX_TRACKED_KEYS = 5000;
 const HOP_BY_HOP = [
   "connection",
   "keep-alive",
@@ -111,12 +126,14 @@ export interface EgressProxy {
     blockedDestinations: BlockedDestination[];
     /** True when more refusals happened than the list holds. */
     blockedDestinationsTruncated: boolean;
+    /** Destinations that did not resolve or refused the connection. */
+    failedConnections: number;
     /** Requests turned away only because a resource limit was reached. */
     limitRefusals: number;
     totalBytes: number;
   };
   wasBlocked(host: string, port: number): boolean;
-  /** Why a destination was refused, if it was. */
+  /** Why a destination was not reached (refused or failed), if it was not. */
   blockReason(host: string, port: number): BlockReason | undefined;
   close(): Promise<void>;
 }
@@ -150,6 +167,10 @@ export async function startEgressProxy(
   const sockets = new Set<Socket>();
   const blocked: BlockedDestination[] = [];
   const blockedKeys = new Map<string, BlockReason>();
+  const failedKeys = new Map<string, BlockReason>();
+  const pendingAttempts = new Set<Socket>();
+  let budgetSignalled = false;
+  let failedCount = 0;
   const blockMarker = randomBytes(16).toString("hex");
   let activeTunnels = 0;
   let limitRefusals = 0;
@@ -158,10 +179,18 @@ export async function startEgressProxy(
   let totalBytes = 0;
 
   function recordBlock(host: string, port: number, reason: BlockReason) {
-    blockedCount += 1;
-    blockedKeys.set(`${host}:${port}`, reason);
-    if (blocked.length < MAX_RECORDED_BLOCKS)
-      blocked.push({ host, port, reason });
+    const key = `${host}:${port}`;
+    if (POLICY_REASONS.has(reason)) {
+      blockedCount += 1;
+      if (blockedKeys.size < MAX_TRACKED_KEYS || blockedKeys.has(key))
+        blockedKeys.set(key, reason);
+      if (blocked.length < MAX_RECORDED_BLOCKS)
+        blocked.push({ host, port, reason });
+    } else {
+      failedCount += 1;
+      if (failedKeys.size < MAX_TRACKED_KEYS || failedKeys.has(key))
+        failedKeys.set(key, reason);
+    }
   }
 
   function track(socket: Socket) {
@@ -173,6 +202,10 @@ export async function startEgressProxy(
       totalBytes += chunk.length;
       if (totalBytes > limits.maxTotalBytes) {
         for (const open of sockets) open.destroy();
+        if (!budgetSignalled) {
+          budgetSignalled = true;
+          options.onBudgetExceeded?.();
+        }
       }
     });
   }
@@ -197,6 +230,8 @@ export async function startEgressProxy(
       try {
         const socket = await new Promise<Socket>((done, fail) => {
           const attempt = connectFn({ host: address, port });
+          pendingAttempts.add(attempt);
+          attempt.once("close", () => pendingAttempts.delete(attempt));
           const timer = setTimeout(() => {
             attempt.destroy();
             fail(new Error("connect timeout"));
@@ -215,8 +250,14 @@ export async function startEgressProxy(
         // Try the next validated address.
       }
     }
-    return { reason: "unresolvable" };
+    return { reason: "connect-failed" };
   }
+
+  /** Marker value for a refusal: policy refusals say "blocked", others "failed". */
+  const markerFor = (reason?: BlockReason): string =>
+    reason && !POLICY_REASONS.has(reason)
+      ? `${blockMarker}:failed`
+      : blockMarker;
 
   function authorized(header: string | string[] | undefined): boolean {
     return typeof header === "string" && header === expectedAuth;
@@ -237,7 +278,7 @@ export async function startEgressProxy(
       ) => {
         if (reason) recordBlock(host, port, reason);
         client.end(
-          `HTTP/1.1 ${status}\r\n${BLOCKED_HEADER}: ${blockMarker}\r\nConnection: close\r\n\r\n`,
+          `HTTP/1.1 ${status}\r\n${BLOCKED_HEADER}: ${markerFor(reason)}\r\nConnection: close\r\n\r\n`,
         );
       };
       if (!authorized(req.headers["proxy-authorization"])) {
@@ -267,7 +308,14 @@ export async function startEgressProxy(
       const result = await open(target.host, target.port);
       if ("reason" in result) {
         release();
-        return deny("403 Forbidden", target.host, target.port, result.reason);
+        return deny(
+          POLICY_REASONS.has(result.reason)
+            ? "403 Forbidden"
+            : "502 Bad Gateway",
+          target.host,
+          target.port,
+          result.reason,
+        );
       }
       allowed += 1;
       const upstream = result.socket;
@@ -286,7 +334,10 @@ export async function startEgressProxy(
     const fail = (code: number, host = "", port = 0, reason?: BlockReason) => {
       if (reason) recordBlock(host, port, reason);
       res
-        .writeHead(code, { Connection: "close", [BLOCKED_HEADER]: blockMarker })
+        .writeHead(code, {
+          Connection: "close",
+          [BLOCKED_HEADER]: markerFor(reason),
+        })
         .end();
     };
     if (!authorized(req.headers["proxy-authorization"])) {
@@ -327,13 +378,21 @@ export async function startEgressProxy(
     const result = await open(authority.host, authority.port);
     if ("reason" in result) {
       release();
-      return fail(403, authority.host, authority.port, result.reason);
+      return fail(
+        POLICY_REASONS.has(result.reason) ? 403 : 502,
+        authority.host,
+        authority.port,
+        result.reason,
+      );
     }
     const socket = result.socket;
     track(socket);
     allowed += 1;
     const headers = { ...req.headers };
     for (const name of HOP_BY_HOP) delete headers[name];
+    // Ask for identity encoding so the download budget counts real bytes, not
+    // the compressed size of a decompression bomb. (HTTPS tunnels are opaque.)
+    delete headers["accept-encoding"];
     const upstream = httpRequest({
       createConnection: () => socket,
       method: req.method,
@@ -373,14 +432,17 @@ export async function startEgressProxy(
       blockedConnections: blockedCount,
       blockedDestinations: [...blocked],
       blockedDestinationsTruncated: blockedCount > blocked.length,
+      failedConnections: failedCount,
       limitRefusals,
       totalBytes,
     }),
     wasBlocked: (host, port) => blockedKeys.has(keyOf(host, port)),
-    blockReason: (host, port) => blockedKeys.get(keyOf(host, port)),
+    blockReason: (host, port) =>
+      blockedKeys.get(keyOf(host, port)) ?? failedKeys.get(keyOf(host, port)),
     close: () =>
       new Promise<void>((done) => {
         for (const socket of sockets) socket.destroy();
+        for (const attempt of pendingAttempts) attempt.destroy();
         server.close(() => done());
         server.closeAllConnections();
       }),

@@ -64,14 +64,40 @@ does not import it, and `POST /api/scan` still returns 503.
   zero. Proxy tests drive raw sockets for rebinding, mixed DNS answers, malformed
   requests and limits. The CLI is tested as a real process.
 
+- **Browser sandbox and limits.** Chromium's own process sandbox is on by default
+  (Playwright otherwise adds `--no-sandbox`); if it cannot start, the scan fails
+  and `--unsafe-no-sandbox` is the only way around it, which the report records.
+  A watchdog stops the scan when the browser's processes together exceed a memory
+  limit (default 2 GiB) and the proxy stops it at a download budget (100 MiB); the
+  page's JavaScript heap is capped at 512 MiB. After every scan, success or
+  failure, remaining browser processes are killed. The memory watchdog uses `ps`
+  and is not enforced on Windows (the report says so).
+- **Evidence integrity.** First-party status is judged against the page the server
+  delivered, not wherever page script navigates afterwards. Requests that match a
+  signature are never crowded out by a flood of ordinary ones. Chromium's
+  synthetic HSTS redirects are not reported. A name that does not resolve or a
+  host that refuses the connection is a failure, not a refusal. Only the proxy
+  can mark a request refused: the marker is a per-run secret and is stripped from
+  upstream responses. Consent-manager detection uses isolated-world locators, so
+  page script cannot forge or break it. Text that reaches the terminal is stripped
+  of control characters.
+
 Limits. This is a convenience safeguard for people scanning sites they choose on
 their own machine. It is **not** infrastructure isolation: a flaw in the proxy,
-the browser or the operating system could defeat it, and a compromised browser
-shares the user's machine. The command line accepts no option to allow private
-addresses; only the library API used by tests can. It does not yet cover consent
-interaction, and one headless visit can differ from what a real visitor sees.
-Not verified: WebRTC and QUIC are disabled by browser flags but have no dedicated
-test; behavior on Windows and behind a corporate proxy is untested.
+the browser or the operating system could defeat it, and with the sandbox on, a
+browser exploit that escapes it still runs with the user's privileges. The command
+line accepts no option to allow private addresses; only the library API used by
+tests can. Not covered: consent interaction; HTTPS decompression bombs are bounded
+by the memory watchdog, not by the byte budget (the proxy sees only compressed
+bytes); any port on a public address is allowed; NAT64 destinations are refused,
+so an IPv6-only network with DNS64 cannot scan IPv4-only sites; cookie-name
+redaction is heuristic and cannot recognize a readable name that embeds a person's
+identifier. One headless visit can differ from what a real visitor sees.
+
+Verified by independent audit on macOS only; **not verified**: Linux and Windows
+behavior of the sandbox, `ps`-based memory limits and `getaddrinfo`; PAC/WPAD
+autodetection, mDNS and multicast; `preconnect` and `dns-prefetch` hints; other
+Chromium versions; behind a corporate proxy.
 
 ## Decision: keep live scanning disabled
 

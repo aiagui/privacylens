@@ -6,8 +6,16 @@ import {
 } from "./signatures.ts";
 import type { Classification, TechnologyFinding } from "./types.ts";
 
+/**
+ * Private suffixes are honored so tenants of a shared platform (alice.github.io
+ * and bob.github.io, *.vercel.app, *.blogspot.com) are different parties.
+ */
 export function registrableDomain(hostname: string): string {
-  return getDomain(hostname) ?? hostname.replace(/^\[|\]$/g, "");
+  const host = hostname.replace(/\.$/, "");
+  return (
+    getDomain(host, { allowPrivateDomains: true }) ??
+    host.replace(/^\[|\]$/g, "")
+  );
 }
 
 export function isThirdParty(
@@ -25,14 +33,25 @@ function hostMatches(signature: Signature, host: string): boolean {
   );
 }
 
+/** A trailing dot is the same host; percent-escapes must not hide a path. */
+function normalized(url: URL): { host: string; path: string } {
+  let path = url.pathname;
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Keep the raw path if it is not valid percent-encoding.
+  }
+  return { host: url.hostname.toLowerCase().replace(/\.$/, ""), path };
+}
+
 function matchSignature(url: URL): Signature | undefined {
-  const host = url.hostname.toLowerCase();
+  const { host, path } = normalized(url);
   return signatures.find((candidate) => {
     if (candidate.domains.length === 0)
-      return candidate.path?.test(url.pathname) ?? false;
+      return candidate.path?.test(path) ?? false;
     return (
       hostMatches(candidate, host) &&
-      (!candidate.path || candidate.path.test(url.pathname))
+      (!candidate.path || candidate.path.test(path))
     );
   });
 }
@@ -109,7 +128,12 @@ export function assessRequest(
 export function isTrackingRequest(url: URL, resourceType: string): boolean {
   if (resourceType === "script") return false;
   const signature = matchSignature(url);
-  return signature?.collection?.test(url.pathname) ?? false;
+  if (!signature?.collection) return false;
+  const { path } = normalized(url);
+  return (
+    signature.collection.test(path) &&
+    (signature.collectionQuery?.test(url.search.replace(/^\?/, "")) ?? true)
+  );
 }
 
 export function safeDestination(url: URL): string {
