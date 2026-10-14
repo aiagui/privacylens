@@ -1,10 +1,48 @@
 import { execFileSync } from "node:child_process";
 import console from "node:console";
+import { createHash } from "node:crypto";
 import process from "node:process";
 
 function git(...args) {
   return execFileSync("git", args, { encoding: "utf8" });
 }
+
+// Only these reviewed product assets may contain binary data. Any byte change
+// needs a fresh content/metadata review and an intentional fingerprint update.
+const reviewedAssets = new Map([
+  [
+    "docs/assets/home-desktop.png",
+    "92f4fc027f013a42b02d405b095197720b24a8d7fee35236d3119691f66746df",
+  ],
+  [
+    "docs/assets/home-mobile.png",
+    "a64bf66719018cf4ab47840c8f15ef4cf9c859ed96578c046628ec78ac460d51",
+  ],
+  [
+    "docs/assets/report-desktop.png",
+    "1b693568a6915b24ef71d4d8ab13bbf6e21a9ec2e01a3520e4d0a27f6ad637bf",
+  ],
+  [
+    "docs/assets/report-mobile.png",
+    "b3656973e695a5be49b1f067095820111efadd6cb57609f1e7d56b8a1152d925",
+  ],
+  [
+    "public/icon.svg",
+    "b44dbb2911e0e8935da525a0bd7dabc1869374677c8a629cb06b992531466a9d",
+  ],
+  [
+    "public/social-preview.png",
+    "d3b2152d8743eb0c2e9b60f1bb330d06b70ca876a4625d0cfae9bb7e10824441",
+  ],
+  [
+    "public/fonts/manrope-latin.ttf",
+    "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
+  ],
+  [
+    "public/fonts/OFL.txt",
+    "d6a309fcfb963d329a93baf9df66fa5f3c23a4be2b5f67edf24d6cafecde12ac",
+  ],
+]);
 
 const rootFiles = new Set([
   ".public-files",
@@ -52,6 +90,7 @@ function allowed(path) {
   if (/\.(?:log|pem|key|bak|bundle|sarif)$/i.test(path)) return false;
   if (lower.split("/").some((part) => part.startsWith(".env"))) return false;
   return (
+    reviewedAssets.has(path) ||
     rootFiles.has(path) ||
     /^(?:src|tests)\/[\w./-]+\.(?:ts|tsx|css)$/.test(path) ||
     /^scripts\/[\w-]+\.mjs$/.test(path) ||
@@ -84,6 +123,18 @@ try {
   for (const { path, mode, stage } of entries) {
     if (!allowed(path) || mode !== "100644" || stage !== "0") {
       rejected.push(`Prohibited staged path or mode: ${JSON.stringify(path)}`);
+      continue;
+    }
+    if (reviewedAssets.has(path)) {
+      const bytes = execFileSync("git", ["show", `:${path}`], {
+        maxBuffer: 16 * 1024 * 1024,
+      });
+      if (
+        createHash("sha256").update(bytes).digest("hex") !==
+        reviewedAssets.get(path)
+      ) {
+        rejected.push(`Unreviewed asset content: ${JSON.stringify(path)}`);
+      }
       continue;
     }
     const content = git("show", `:${path}`);

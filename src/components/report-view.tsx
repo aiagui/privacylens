@@ -1,10 +1,16 @@
 import type { ScanReport } from "@/scanner/types";
+import { OpticalField } from "@/components/optical-field";
+import { RequestJourney } from "@/components/request-journey";
 
 function displayDate(date: string): string {
   const parsed = new Date(date);
   return Number.isNaN(parsed.getTime())
     ? "Time unavailable"
-    : parsed.toLocaleString("en", { dateStyle: "medium", timeStyle: "short" });
+    : parsed.toLocaleString("en", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "UTC",
+      });
 }
 
 function displayValue(value?: string | null): string {
@@ -19,7 +25,7 @@ function displayTarget(url: string): string {
   }
 }
 
-function EvidenceLabel({
+export function EvidenceLabel({
   kind,
 }: {
   kind: "observed" | "inferred" | "unknown";
@@ -58,11 +64,7 @@ export function ReportView({
   );
 
   return (
-    <section
-      className="report"
-      aria-labelledby="report-heading"
-      aria-live="polite"
-    >
+    <section className="report" aria-labelledby="report-heading">
       {sample && (
         <div className="sample-banner" role="note">
           <strong>Sample data.</strong> This report illustrates
@@ -70,16 +72,31 @@ export function ReportView({
           result of a live scan.
         </div>
       )}
-      <div className="report-heading-row">
-        <div>
-          <span className="section-kicker">
-            {sample ? "SAMPLE REPORT" : "SCAN REPORT"}
-          </span>
-          <h2 id="report-heading">What we observed</h2>
-          <p className="report-target">{displayTarget(report.targetUrl)}</p>
+      <div className="report-focus">
+        <div className="report-heading-row">
+          <div>
+            <p className="eyebrow">
+              {sample ? "SAMPLE INSPECTION" : "WEBSITE INSPECTION"}
+            </p>
+            <h1 id="report-heading">
+              What we observed<span>Behind the page.</span>
+            </h1>
+            <p className="report-target">{displayTarget(report.targetUrl)}</p>
+            <p className="report-context">
+              Tracking technologies, cookies and destinations — with the
+              evidence to make sense of each signal.
+            </p>
+            <div className="report-timestamp">
+              {sample ? "Example timestamp" : "Scanned"}{" "}
+              {displayDate(report.scannedAt)} UTC
+            </div>
+          </div>
         </div>
-        <div className="report-timestamp">
-          Scanned {displayDate(report.scannedAt)}
+        <div className="report-optics">
+          <OpticalField />
+          <p className="report-window">
+            Initial page load <span>Before consent interaction</span>
+          </p>
         </div>
       </div>
 
@@ -98,16 +115,56 @@ export function ReportView({
         </div>
       </div>
 
-      <div className="interpretation-note">
-        <EvidenceLabel kind="observed" /> Direct browser evidence
-        <EvidenceLabel kind="inferred" /> A supported interpretation
-        <EvidenceLabel kind="unknown" /> Not established by this scan
+      <div
+        className="interpretation-note"
+        id="evidence-guide"
+        aria-label="Evidence guide"
+      >
+        <span>
+          <EvidenceLabel kind="observed" /> Direct browser evidence
+        </span>
+        <span>
+          <EvidenceLabel kind="inferred" /> A supported interpretation
+        </span>
+        <span>
+          <EvidenceLabel kind="unknown" /> Not established by this observation
+        </span>
       </div>
+
+      <details className="reading-guide">
+        <summary>How to read these signals</summary>
+        <div className="reading-guide-grid">
+          <div>
+            <strong>Evidence comes first</strong>
+            <p>
+              Observed means direct browser evidence. Inferred means a supported
+              interpretation. Unknown means this observation cannot establish
+              it; it does not prove absence.
+            </p>
+          </div>
+          <div>
+            <strong>A request is a signal</strong>
+            <p>
+              Timing describes when a request was initiated, not proof that a
+              destination received data. Technology detection links that signal
+              to a known pattern.
+            </p>
+          </div>
+          <div>
+            <strong>Consent needs context</strong>
+            <p>
+              A possible consent manager is a presence signal. This observation
+              includes no accept or reject choice and cannot establish whether
+              consent is respected.
+            </p>
+          </div>
+        </div>
+      </details>
 
       <div className="report-grid">
         <section className="report-panel" aria-labelledby="technology-heading">
           <div className="panel-heading">
-            <h3 id="technology-heading">Detected technologies</h3>
+            <h2 id="technology-heading">Detected technologies</h2>
             <span>{technologies.length}</span>
           </div>
           {technologies.length ? (
@@ -147,7 +204,7 @@ export function ReportView({
 
         <section className="report-panel" aria-labelledby="consent-heading">
           <div className="panel-heading">
-            <h3 id="consent-heading">Consent signals</h3>
+            <h2 id="consent-heading">Consent signals</h2>
           </div>
           <div className="consent-state">
             <EvidenceLabel
@@ -155,8 +212,8 @@ export function ReportView({
             />
             <strong>
               {report.cmp?.detected
-                ? `Potential CMP: ${report.cmp.name ?? "unidentified"}`
-                : "CMP presence not established"}
+                ? `Possible consent manager: ${report.cmp.name ?? "unidentified"}`
+                : "Consent manager not established"}
             </strong>
             {report.cmp?.evidence && <p>{report.cmp.evidence}</p>}
           </div>
@@ -167,46 +224,70 @@ export function ReportView({
         </section>
       </div>
 
+      <RequestJourney requests={requests} sample={sample} />
+
       <section
         className="report-panel report-panel-wide"
         aria-labelledby="cookie-heading"
       >
         <div className="panel-heading">
-          <h3 id="cookie-heading">Cookie inventory</h3>
+          <h2 id="cookie-heading">Cookie inventory</h2>
           <span>{cookies.length}</span>
         </div>
+        <details className="cookie-guide">
+          <summary>Understand cookie attributes</summary>
+          <p>
+            <strong>Secure</strong> limits sending to secure connections.{" "}
+            <strong>HttpOnly</strong> prevents page scripts from reading the
+            cookie. <strong>SameSite</strong> controls when it accompanies
+            cross-site requests. These flags describe browser handling, not the
+            cookie&apos;s purpose. Cookie values are omitted.
+          </p>
+        </details>
         {cookies.length ? (
-          <div className="table-scroll">
-            <table>
-              <caption className="visually-hidden">
-                Cookies observed during the scan
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Cookie</th>
-                  <th scope="col">Domain</th>
-                  <th scope="col">Party</th>
-                  <th scope="col">Expires</th>
-                  <th scope="col">Secure</th>
-                  <th scope="col">HttpOnly</th>
-                  <th scope="col">SameSite</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cookies.map((cookie, index) => (
-                  <tr key={`${cookie.domain}-${cookie.name}-${index}`}>
-                    <th scope="row">{cookie.name}</th>
-                    <td>{cookie.domain}</td>
-                    <td>{cookie.firstParty ? "First-party" : "Third-party"}</td>
-                    <td>{displayValue(cookie.expires)}</td>
-                    <td>{cookie.secure ? "Yes" : "No"}</td>
-                    <td>{cookie.httpOnly ? "Yes" : "No"}</td>
-                    <td>{displayValue(cookie.sameSite)}</td>
+          <>
+            <p className="table-help">
+              Scroll the table horizontally to explore all attributes.
+            </p>
+            <div
+              className="table-scroll"
+              role="region"
+              aria-label="Cookie attributes"
+              tabIndex={0}
+            >
+              <table>
+                <caption className="visually-hidden">
+                  Cookies observed during the scan
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Cookie</th>
+                    <th scope="col">Domain</th>
+                    <th scope="col">Party</th>
+                    <th scope="col">Expires</th>
+                    <th scope="col">Secure</th>
+                    <th scope="col">HttpOnly</th>
+                    <th scope="col">SameSite</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {cookies.map((cookie, index) => (
+                    <tr key={`${cookie.domain}-${cookie.name}-${index}`}>
+                      <th scope="row">{cookie.name}</th>
+                      <td>{cookie.domain}</td>
+                      <td>
+                        {cookie.firstParty ? "First-party" : "Third-party"}
+                      </td>
+                      <td>{displayValue(cookie.expires)}</td>
+                      <td>{cookie.secure ? "Yes" : "No"}</td>
+                      <td>{cookie.httpOnly ? "Yes" : "No"}</td>
+                      <td>{displayValue(cookie.sameSite)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <EmptyState>
             No cookies were observed in this scan. This does not prove the site
@@ -220,41 +301,53 @@ export function ReportView({
         aria-labelledby="network-heading"
       >
         <div className="panel-heading">
-          <h3 id="network-heading">Third-party network activity</h3>
+          <h2 id="network-heading">Third-party network activity</h2>
           <span>{requests.length}</span>
         </div>
         {requests.length ? (
-          <div className="table-scroll">
-            <table>
-              <caption className="visually-hidden">
-                Third-party requests observed during the scan
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Destination</th>
-                  <th scope="col">Technology</th>
-                  <th scope="col">Timing</th>
-                  <th scope="col">Consent state</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((request, index) => (
-                  <tr key={`${request.url}-${index}`}>
-                    <th scope="row">{request.domain || request.url}</th>
-                    <td>{request.technology ?? "Unknown"}</td>
-                    <td>
-                      {typeof request.timeMs === "number"
-                        ? `${Math.round(request.timeMs)} ms`
-                        : "Unknown"}
-                    </td>
-                    <td>
-                      {request.beforeConsent ? "Before interaction" : "Unknown"}
-                    </td>
+          <>
+            <p className="table-help">
+              Scroll the table horizontally to explore all request details.
+            </p>
+            <div
+              className="table-scroll"
+              role="region"
+              aria-label="Third-party request details"
+              tabIndex={0}
+            >
+              <table>
+                <caption className="visually-hidden">
+                  Third-party requests observed during the scan
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Destination</th>
+                    <th scope="col">Technology</th>
+                    <th scope="col">Timing</th>
+                    <th scope="col">Consent state</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {requests.map((request, index) => (
+                    <tr key={`${request.url}-${index}`}>
+                      <th scope="row">{request.domain || request.url}</th>
+                      <td>{request.technology ?? "Unknown"}</td>
+                      <td>
+                        {typeof request.timeMs === "number"
+                          ? `${Math.round(request.timeMs)} ms`
+                          : "Unknown"}
+                      </td>
+                      <td>
+                        {request.beforeConsent
+                          ? "Before interaction"
+                          : "Unknown"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <EmptyState>
             No third-party requests were observed in this scan window.
@@ -274,7 +367,7 @@ export function ReportView({
               aria-labelledby="concerns-heading"
             >
               <div className="panel-heading">
-                <h3 id="concerns-heading">Potential concerns</h3>
+                <h2 id="concerns-heading">Potential concerns</h2>
               </div>
               <ul className="plain-list">
                 {concerns.map((concern, index) => (
@@ -292,7 +385,7 @@ export function ReportView({
               aria-labelledby="limitations-heading"
             >
               <div className="panel-heading">
-                <h3 id="limitations-heading">What remains unknown</h3>
+                <h2 id="limitations-heading">What remains unknown</h2>
               </div>
               <ul className="plain-list">
                 {limitations.map((limitation, index) => (
