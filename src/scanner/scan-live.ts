@@ -151,6 +151,29 @@ function describeOutcome(raw: RawRequest): string {
   return "Outcome: not recorded.";
 }
 
+/**
+ * Evidence lines per technology are bounded: a page can contact thousands of
+ * hosts under one vendor's domain, and each distinct one would add a line. The
+ * first lines are kept and the rest are counted.
+ */
+const MAX_EVIDENCE_LINES = 50;
+const MORE_PREFIX = "And ";
+
+export function addEvidence(lines: string[], line: string): string[] {
+  const more = lines.findIndex((entry) => entry.startsWith(MORE_PREFIX));
+  const kept = more === -1 ? lines : lines.slice(0, more);
+  if (kept.includes(line)) return lines;
+  if (kept.length < MAX_EVIDENCE_LINES) {
+    return [...kept, line, ...(more === -1 ? [] : [lines[more]!])];
+  }
+  const hidden =
+    more === -1 ? 1 : Number(/^And (\d+) /.exec(lines[more]!)?.[1] ?? 0) + 1;
+  return [
+    ...kept,
+    `${MORE_PREFIX}${hidden} more similar requests are not listed.`,
+  ];
+}
+
 const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 function tryUrl(value: string): URL | undefined {
@@ -283,7 +306,7 @@ export async function scanLive(
       const raw: RawRequest = {
         url: requestUrl,
         resourceType: request.resourceType(),
-        timeMs: Date.now() - navigationStart,
+        timeMs: Math.max(0, Date.now() - navigationStart),
       };
       if (keep(requestUrl, raw.resourceType)) recorded.set(request, raw);
     });
@@ -327,7 +350,7 @@ export async function scanLive(
       const raw: RawRequest = {
         url: socketUrl,
         resourceType: "websocket",
-        timeMs: Date.now() - navigationStart,
+        timeMs: Math.max(0, Date.now() - navigationStart),
       };
       if (!keep(socketUrl, "websocket")) return;
       sockets.push(raw);
@@ -429,12 +452,10 @@ export async function scanLive(
           ...detected,
           signature: assessment.signature,
           observation,
-          evidence: [
-            ...new Set([
-              ...(existing?.evidence ?? []),
-              `${assessment.reason} Destination: ${safeDestination(raw.url)}. ${describeOutcome(raw)}`,
-            ]),
-          ],
+          evidence: addEvidence(
+            existing?.evidence ?? [],
+            `${assessment.reason} Destination: ${safeDestination(raw.url)}. ${describeOutcome(raw)}`,
+          ),
         });
       }
       if (thirdParty) {

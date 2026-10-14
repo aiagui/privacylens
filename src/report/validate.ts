@@ -1,3 +1,4 @@
+import { isUnsafeCharacter } from "./text";
 import {
   REPORT_SCHEMA_VERSION,
   type Classification,
@@ -60,20 +61,8 @@ class Issues {
   }
 }
 
-function isUnsafeCharacter(code: number): boolean {
-  return (
-    code <= 0x1f ||
-    (code >= 0x7f && code <= 0x9f) ||
-    code === 0x2028 ||
-    code === 0x2029 ||
-    (code >= 0x200b && code <= 0x200f) ||
-    (code >= 0x202a && code <= 0x202e) ||
-    (code >= 0x2066 && code <= 0x2069) ||
-    code === 0xfeff
-  );
-}
-
 function describe(value: unknown): string {
+  if (value === undefined) return "nothing (the field is missing)";
   if (value === null) return "null";
   if (Array.isArray(value)) return "an array";
   return typeof value === "object" ? "an object" : `a ${typeof value}`;
@@ -108,7 +97,7 @@ function record(
   for (const key of Object.keys(value)) {
     if (!allowed.includes(key))
       issues.add(
-        path ? `${path}.${key.length > 40 ? "..." : key}` : shown(key),
+        path ? `${path}.${shown(key).slice(1, -1)}` : shown(key),
         `is not a known field (unknown field ${shown(key)})`,
       );
   }
@@ -221,15 +210,28 @@ function isoDate(issues: Issues, value: unknown, path: string) {
     pattern: ISO,
     patternHint: "must be a UTC time like 2026-10-14T09:14:00.000Z",
   });
-  if (parsed !== undefined && Number.isNaN(Date.parse(parsed))) {
-    issues.add(path, "is not a real date");
-    return undefined;
+  if (parsed !== undefined) {
+    const time = Date.parse(parsed);
+    // Date.parse rolls impossible dates over (Feb 30 becomes Mar 2); the round
+    // trip catches that.
+    if (
+      Number.isNaN(time) ||
+      new Date(time).toISOString().slice(0, 19) !== parsed.slice(0, 19)
+    ) {
+      issues.add(path, "is not a real date");
+      return undefined;
+    }
   }
   return parsed;
 }
 
 /** An http(s) origin: scheme, host and optional port, nothing else. */
-function origin(issues: Issues, value: unknown, path: string) {
+function origin(
+  issues: Issues,
+  value: unknown,
+  path: string,
+  schemes: readonly string[] = ["http:", "https:"],
+) {
   const raw = text(issues, value, path, LIMITS.origin, { min: 1 });
   if (raw === undefined) return undefined;
   let url: URL;
@@ -240,21 +242,24 @@ function origin(issues: Issues, value: unknown, path: string) {
     return undefined;
   }
   if (
-    !["http:", "https:"].includes(url.protocol) ||
+    !schemes.includes(url.protocol) ||
     url.origin !== raw ||
     raw.endsWith("/")
   ) {
     issues.add(
       path,
-      "must be an http or https origin with no path, query, fragment or credentials",
+      `must be a ${schemes.map((scheme) => scheme.slice(0, -1)).join(", ")} origin with no path, query, fragment or credentials`,
     );
     return undefined;
   }
   return raw;
 }
 
-const HOSTNAME = /^[A-Za-z0-9.\-[\]:]{1,300}$/;
-const COOKIE_DOMAIN = /^\.?[A-Za-z0-9.\-[\]:]{1,300}$/;
+// Host names as the URL parser produces them: letters, digits, dots, hyphens,
+// underscores (common in real host names), IPv6 brackets and colons, and the
+// other characters URLs allow in a host. No spaces, slashes, quotes or markup.
+const HOSTNAME = /^[A-Za-z0-9._~!$&'()*+,;=:[\]-]{1,300}$/;
+const COOKIE_DOMAIN = /^\.?[A-Za-z0-9._~!$&'()*+,;=:[\]-]{1,300}$/;
 const TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 const CATEGORIES = [
@@ -384,7 +389,13 @@ function request(issues: Issues, value: unknown, path: string) {
     "outcome",
   ]);
   if (!rec) return undefined;
-  const url = origin(issues, rec.url, `${path}.url`);
+  // WebSocket connections are recorded as ws or wss origins.
+  const url = origin(issues, rec.url, `${path}.url`, [
+    "http:",
+    "https:",
+    "ws:",
+    "wss:",
+  ]);
   const domain = text(issues, rec.domain, `${path}.domain`, LIMITS.hostname, {
     min: 1,
     pattern: HOSTNAME,
@@ -395,6 +406,16 @@ function request(issues: Issues, value: unknown, path: string) {
         min: 1,
       })
     : undefined;
+  if (url && domain) {
+    let host = "";
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      // origin() already rejected anything that does not parse.
+    }
+    if (host !== domain)
+      issues.add(`${path}.domain`, "must be the host of the request's url");
+  }
   let timeMs: number | undefined;
   if (
     typeof rec.timeMs !== "number" ||
@@ -406,7 +427,7 @@ function request(issues: Issues, value: unknown, path: string) {
       `${path}.timeMs`,
       "must be a number of milliseconds from 0 to 86400000",
     );
-  else timeMs = rec.timeMs;
+  else timeMs = rec.timeMs + 0; // turns -0 into 0
   if (rec.beforeConsent !== true)
     issues.add(
       `${path}.beforeConsent`,
@@ -432,6 +453,11 @@ function request(issues: Issues, value: unknown, path: string) {
         "blocked",
       ] as const)
     : undefined;
+  if (technology !== undefined && classification === "unknown")
+    issues.add(
+      `${path}.classification`,
+      "cannot be unknown for a request that names a technology",
+    );
   if (
     !url ||
     !domain ||

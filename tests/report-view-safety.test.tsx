@@ -28,7 +28,9 @@ function hostileReport() {
     t.evidence = [next(), next()];
   }
   for (const c of draft.cookies) c.name = next();
-  for (const r of draft.thirdPartyRequests) r.technology = next();
+  for (const r of draft.thirdPartyRequests)
+    // A technology is only ever named for a request that matched a signature.
+    if (r.classification !== "unknown") r.technology = next();
   draft.cmp = { detected: true, name: next(), evidence: next() };
   draft.concerns = [{ title: next(), detail: next(), level: "attention" }];
   draft.limitations = [next(), next()];
@@ -146,5 +148,24 @@ describe("imported report display", () => {
     expect(
       renderToStaticMarkup(<ReportView report={SAMPLE_REPORT} imported />),
     ).not.toContain("How this report was collected");
+  });
+});
+
+describe("very large imported reports", () => {
+  it("bounds the interactive timeline, and says so, while the inventory lists everything", () => {
+    const big = JSON.parse(
+      JSON.stringify(SAMPLE_REPORT),
+    ) as typeof SAMPLE_REPORT;
+    const template = big.thirdPartyRequests[1]!;
+    big.thirdPartyRequests = Array.from({ length: 2500 }, (_, i) => ({
+      ...template,
+      timeMs: i,
+    }));
+    const html = renderToStaticMarkup(<ReportView report={big} imported />);
+    expect(html.match(/destination-number/g)?.length).toBe(100);
+    expect(html).toContain("The timeline shows the first 100");
+    expect(html).toContain("2500 request signals");
+    // Every request is still in the inventory table.
+    expect(html.match(/<tr\b/g)!.length).toBeGreaterThan(2500);
   });
 });

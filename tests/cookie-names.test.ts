@@ -27,4 +27,27 @@ describe("cookie name redaction", () => {
   ])("keeps ordinary readable name %s", (name) => {
     expect(sanitizeCookieName(name)).toBe(name);
   });
+
+  it("gives a nameless cookie a placeholder, because Chromium reports one as an empty name", () => {
+    expect(sanitizeCookieName("")).toBe("[unnamed]");
+  });
+
+  it.each([
+    "a\u200bb",
+    "\u202eevil",
+    "x\u0085y",
+    "x\u200fy",
+    "x\u2066y",
+    "x\ufeffy",
+    "x\u007fy",
+  ])(
+    "redacts a name with a character the report format refuses (%j)",
+    (name) => {
+      expect(sanitizeCookieName(name)).toBe("[REDACTED]");
+    },
+  );
+
+  it("keeps a name written with a zero-width joiner", () => {
+    expect(sanitizeCookieName("می\u200cخواهم")).toBe("می\u200cخواهم");
+  });
 });

@@ -16,6 +16,9 @@ SECURITY.md
 docs/architecture.md
 docs/assets/home-desktop.png
 docs/assets/home-mobile.png
+docs/assets/import-empty-desktop.png
+docs/assets/import-report-desktop.png
+docs/assets/import-report-mobile.png
 docs/assets/report-desktop.png
 docs/assets/report-mobile.png
 docs/ci-and-releases.md
@@ -57,6 +60,7 @@ src/components/request-journey.tsx
 src/components/site-chrome.tsx
 src/proxy.ts
 src/report/import.ts
+src/report/text.ts
 src/report/validate.ts
 src/sample-report.ts
 src/scanner/browser-process.ts
@@ -77,6 +81,7 @@ tests/detectors.test.ts
 tests/dev-fixture-registry.test.ts
 tests/dev-scan-fixture-route.test.ts
 tests/egress-proxy.test.ts
+tests/evidence-cap.test.ts
 tests/helpers/sandbox.ts
 tests/ip-policy.test.ts
 tests/proxy.test.ts

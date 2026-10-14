@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_REPORT_BYTES, readReportFile } from "@/report/import";
+import { isUnsafeCharacter } from "@/report/text";
 import type { ValidationIssue } from "@/report/validate";
 import type { ScanReport } from "@/scanner/types";
 import { ReportView } from "@/components/report-view";
@@ -20,17 +21,9 @@ type State =
 /** A file name is user data: show it as plain, bounded text only. */
 function safeName(name: string): string {
   const cleaned = [...name]
-    .map((character) => {
-      const code = character.codePointAt(0) ?? 0;
-      return code <= 0x1f ||
-        (code >= 0x7f && code <= 0x9f) ||
-        (code >= 0x200b && code <= 0x200f) ||
-        (code >= 0x202a && code <= 0x202e) ||
-        (code >= 0x2066 && code <= 0x2069) ||
-        code === 0xfeff
-        ? " "
-        : character;
-    })
+    .map((character) =>
+      isUnsafeCharacter(character.codePointAt(0) ?? 0) ? " " : character,
+    )
     .join("")
     .trim();
   return cleaned.length > 80 ? `${cleaned.slice(0, 80)}…` : cleaned || "report";
@@ -52,6 +45,9 @@ export function ReportImport() {
   const errorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const returnFocus = useRef(false);
+  // Only the most recently chosen file may update the page: a slow read of an
+  // earlier choice must not overwrite a later one.
+  const latest = useRef(0);
 
   // Dropping a file anywhere else on the page would make the browser navigate
   // to it; keep the page, and the report, where they are.
@@ -80,6 +76,7 @@ export function ReportImport() {
   const open = useCallback(async (files: FileList | null | undefined) => {
     if (!files || files.length === 0) return;
     if (files.length > 1) {
+      latest.current += 1;
       setState({
         phase: "error",
         fileName: "",
@@ -92,8 +89,10 @@ export function ReportImport() {
     }
     const file = files[0]!;
     const fileName = safeName(file.name);
+    const ticket = ++latest.current;
     setState({ phase: "reading", fileName });
     const result = await readReportFile(file);
+    if (ticket !== latest.current) return;
     setState(
       result.ok
         ? { phase: "loaded", fileName, report: result.report }
@@ -109,6 +108,7 @@ export function ReportImport() {
   }, []);
 
   const reset = () => {
+    latest.current += 1;
     returnFocus.current = true;
     setState({ phase: "idle" });
   };

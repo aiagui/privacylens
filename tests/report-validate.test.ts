@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SAMPLE_REPORT } from "../src/sample-report";
+import { hasUnsafeCharacter } from "../src/report/text";
 import { LIMITS, validateReport } from "../src/report/validate";
 import type { ScanReport } from "../src/scanner/types";
 
@@ -664,5 +665,181 @@ describe("validateReport: robustness", () => {
         Object.getOwnPropertyDescriptor(result.report, "status")?.get,
       ).toBeUndefined();
     expect(typeof ran).toBe("boolean");
+  });
+});
+
+describe("validateReport: fixes from the import review", () => {
+  const request = (change: (r: Draft) => void) =>
+    mutated((d) => change(d.thirdPartyRequests[1] as Draft));
+
+  it.each(["ws://chat.vendor.example", "wss://chat.vendor.example:8443"])(
+    "accepts a WebSocket request origin %s, as the scanner writes them",
+    (url) => {
+      const host = new URL(url).hostname;
+      expect(
+        validateReport(
+          request((r) => {
+            r.url = url;
+            r.domain = host;
+            r.resourceType = "websocket";
+          }),
+        ).ok,
+      ).toBe(true);
+    },
+  );
+
+  it("still requires http(s) for the target and the provenance origins", () => {
+    expectRejected(
+      mutated((d) => (d.targetUrl = "wss://site.example")),
+      "targetUrl",
+    );
+    expectRejected(
+      mutated((d) => (d.provenance.finalOrigin = "ws://site.example")),
+      "finalOrigin",
+    );
+    expectRejected(
+      request((r) => (r.url = "ftp://a.example")),
+      /url/,
+    );
+  });
+
+  it("requires a request's domain to be the host of its url", () => {
+    expectRejected(
+      request((r) => {
+        r.url = "https://a.example";
+        r.domain = "b.example";
+      }),
+      /host of the request/,
+    );
+  });
+
+  it.each([
+    "my_cdn.example",
+    "a_b.c_d.example",
+    "xn--bcher-kva.example",
+    "[2001:db8::1]",
+    "tilde~host.example",
+  ])("accepts the real host name %s", (host) => {
+    const origin = `https://${host}`;
+    const parsed = new URL(origin);
+    expect(
+      validateReport(
+        request((r) => {
+          r.url = parsed.origin;
+          r.domain = parsed.hostname;
+        }),
+      ).ok,
+      host,
+    ).toBe(true);
+  });
+
+  it("accepts a cookie domain with an underscore", () => {
+    expect(
+      validateReport(mutated((d) => (d.cookies[0].domain = ".my_cdn.example")))
+        .ok,
+    ).toBe(true);
+  });
+
+  it.each([
+    "a b.example",
+    "a/b.example",
+    "<img>.example",
+    'a".example',
+    "a\\b.example",
+    "a@b.example",
+    "a?b.example",
+  ])("still rejects the host %j", (host) => {
+    expectRejected(
+      mutated((d) => (d.cookies[0].domain = host)),
+      /domain/,
+    );
+  });
+
+  it("allows zero-width joiners that real scripts and emoji need, but not other invisible characters", () => {
+    for (const name of ["می\u200cخواهم", "\u{1F469}\u200D\u{1F4BB} developer"])
+      expect(
+        validateReport(mutated((d) => (d.technologies[0].name = name))).ok,
+        name,
+      ).toBe(true);
+    for (const name of ["a\u200bb", "a\u200eb", "a\u200fb"])
+      expectRejected(mutated((d) => (d.technologies[0].name = name)));
+  });
+
+  it("turns -0 into 0 and rejects impossible calendar dates", () => {
+    const negativeZero = JSON.parse(
+      JSON.stringify(WITH_PROVENANCE).replace('"timeMs":182', '"timeMs":-0'),
+    );
+    const result = validateReport(negativeZero);
+    if (!result.ok) throw new Error("expected ok");
+    expect(Object.is(result.report.thirdPartyRequests[0]!.timeMs, 0)).toBe(
+      true,
+    );
+    expectRejected(
+      mutated((d) => (d.scannedAt = "2026-02-30T00:00:00Z")),
+      /scannedAt/,
+    );
+    expectRejected(
+      mutated((d) => (d.scannedAt = "2026-04-31T10:00:00.000Z")),
+      /scannedAt/,
+    );
+    expect(
+      validateReport(mutated((d) => (d.scannedAt = "2028-02-29T00:00:00.000Z")))
+        .ok,
+    ).toBe(true);
+    expectRejected(
+      mutated((d) => (d.scannedAt = "2027-02-29T00:00:00.000Z")),
+      /scannedAt/,
+    );
+  });
+
+  it("rejects a technology on a request classified unknown, and accepts it otherwise", () => {
+    expectRejected(
+      request((r) => {
+        r.technology = "Matomo";
+        r.classification = "unknown";
+      }),
+      /cannot be unknown/,
+    );
+    expect(
+      validateReport(
+        request((r) => {
+          r.technology = "Matomo";
+          r.classification = "observed";
+        }),
+      ).ok,
+    ).toBe(true);
+    expect(
+      validateReport(
+        request((r) => {
+          delete r.technology;
+          r.classification = "unknown";
+        }),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("sanitizes hostile key names in the error path as well as the message", () => {
+    const result = expectRejected({
+      ...JSON.parse(JSON.stringify(SAMPLE_REPORT)),
+      cmp: { detected: false, ["\u202e<img src=x onerror=1>"]: 1 },
+    });
+    if (!result.ok) {
+      const all = result.issues
+        .map((i) => `${i.path} ${i.message}`)
+        .join(" | ");
+      // No control, direction or invisible character may survive into the text.
+      expect(hasUnsafeCharacter(all)).toBe(false);
+    }
+  });
+
+  it("says a missing field is missing, not 'a undefined'", () => {
+    const result = expectRejected(
+      mutated((d) => delete d.targetUrl),
+      "targetUrl",
+    );
+    if (!result.ok)
+      expect(result.issues.map((i) => i.message).join(" ")).not.toContain(
+        "undefined",
+      );
   });
 });

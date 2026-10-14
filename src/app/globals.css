@@ -1626,3 +1626,26 @@ tbody tr:last-child > * {
     padding: 22px;
   }
 }
+
+/* Long unbroken strings in report data (a technology name, a destination host,
+   a limitation) must wrap inside their card instead of widening the page. */
+.report strong,
+.report code,
+.report li,
+.report p,
+.report dd,
+.report h2,
+.report h3,
+.list-title-row,
+.evidence-list li,
+.plain-list li,
+.consent-state strong {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.list-title-row {
+  gap: 12px;
+}
+.list-title-row > .evidence-label {
+  flex: none;
+}

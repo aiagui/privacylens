@@ -12,19 +12,31 @@ function git(...args) {
 const reviewedAssets = new Map([
   [
     "docs/assets/home-desktop.png",
-    "d22202de61b3a233a73a39f74ee37615b1b40e30b8f3e7f24a9d5e93777bbde5",
+    "0dc205d9521c579dde843e23eb88d24a7bea54165d70c2a1849880290869c15b",
   ],
   [
     "docs/assets/home-mobile.png",
-    "8accf19d1f9b0266c0c4b6fd72e86ec42a29a2e147469b40728dab6dfebea2ff",
+    "a1920323424516ab27f4d38e44cc01119624d1a4d9961f1b139d31aaa63febae",
   ],
   [
     "docs/assets/report-desktop.png",
-    "4fd3ece09ec56e9507cfcad0c66b598dcdd71a8f86d691e91847e8ea565ec59b",
+    "f0859d78e1ebfe406e69efa665b3c82307f791c6043e5d9d6a06aae5615fea04",
   ],
   [
     "docs/assets/report-mobile.png",
-    "f4d38c075fe3097da342d84baad6f0f206698a91ecfc53048cc67087e4d2f86e",
+    "8fa965ed9f38380be4cfcc8a5cd5369f1f844a1364efc163a130fc6101cd7e50",
+  ],
+  [
+    "docs/assets/import-empty-desktop.png",
+    "4e18bdcc72252e5744cfc475d21e0278ae8606ad80cfb7d1fa3b01c281a3d9da",
+  ],
+  [
+    "docs/assets/import-report-desktop.png",
+    "7cb0bbadc77bcc375bf33d76dba4e6580a5fc2673c96a46f19bb0c9c1285a8e7",
+  ],
+  [
+    "docs/assets/import-report-mobile.png",
+    "88653d9868f955cc8c8d8817a0c4509fddd5b0b37532ba2ca64e6dd38908de18",
   ],
   [
     "public/icon.svg",

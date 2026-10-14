@@ -101,7 +101,48 @@ hostile.technologies = hostile.technologies.map((t, i) => ({
 hostile.concerns = [{ title: evil[0], detail: evil[3], level: "attention" }];
 hostile.limitations = [evil[1], evil[2]];
 hostile.cmp = { detected: true, name: evil[3], evidence: evil[0] };
+// Long unbroken strings in every free-text field, and a maximum-size report.
+const token = (n) => "A".repeat(n);
+const longTokens = JSON.parse(JSON.stringify(cliReport));
+longTokens.technologies = longTokens.technologies.map((t) => ({
+  ...t,
+  name: token(200),
+  evidence: [token(2000)],
+}));
+longTokens.cookies = [
+  {
+    name: token(300),
+    domain: token(250),
+    firstParty: true,
+    secure: true,
+    httpOnly: false,
+  },
+  ...longTokens.cookies,
+];
+longTokens.concerns = [
+  { title: token(200), detail: token(2000), level: "attention" },
+];
+longTokens.limitations = [token(2000)];
+longTokens.cmp = { detected: true, name: token(100), evidence: token(200) };
+longTokens.provenance.egress.blockedDestinations = [
+  { host: token(300), port: 80, reason: "non-public-address" },
+];
+const heavy = JSON.parse(JSON.stringify(cliReport));
+const template = heavy.thirdPartyRequests[0];
+heavy.thirdPartyRequests = Array.from({ length: 2500 }, (_, i) => ({
+  ...template,
+  timeMs: i,
+}));
+heavy.cookies = Array.from({ length: 500 }, (_, i) => ({
+  name: `cookie_${i}`,
+  domain: "site.example",
+  firstParty: true,
+  secure: true,
+  httpOnly: false,
+}));
 const files = {
+  longTokens: join(work, "long-tokens.json"),
+  heavy: join(work, "heavy.json"),
   cli: cliReportPath,
   hostile: join(work, "hostile.json"),
   notJson: join(work, "not-json.json"),
@@ -112,6 +153,8 @@ const files = {
   big: join(work, "big.json"),
 };
 await writeFile(files.hostile, JSON.stringify(hostile));
+await writeFile(files.longTokens, JSON.stringify(longTokens));
+await writeFile(files.heavy, JSON.stringify(heavy));
 await writeFile(files.notJson, "this is not json {");
 await writeFile(
   files.version2,
@@ -327,18 +370,23 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   const screenshotDir = process.env.PRIVACYLENS_SCREENSHOT_DIR;
+  // Capture from a settled page: no focus ring or scroll offset left over from
+  // the checks above, and layout finished after each resize.
+  const capture = async (name, width, height) => {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => {
+      globalThis.document.activeElement?.blur?.();
+      globalThis.scrollTo(0, 0);
+    });
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: join(screenshotDir, name), fullPage: true });
+  };
   if (screenshotDir) {
     await mkdir(screenshotDir, { recursive: true });
-    await page.screenshot({
-      path: join(screenshotDir, "import-report-desktop.png"),
-      fullPage: true,
-    });
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({
-      path: join(screenshotDir, "import-report-mobile.png"),
-      fullPage: true,
-    });
+    await capture("import-report-desktop.png", 1440, 1000);
+    await capture("import-report-mobile.png", 390, 844);
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.waitForTimeout(300);
   }
 
   // Closing discards the report and returns to the importer.
@@ -502,6 +550,95 @@ try {
     .waitFor();
   assert.doesNotMatch(await reportMain(), new RegExp(MARKER));
 
+  // ---- A slow read of an earlier choice must not overwrite a later one ----
+  await page.reload();
+  await page
+    .getByRole("heading", { level: 1, name: /Explore a report/ })
+    .waitFor();
+  await page.evaluate(() => {
+    const original = globalThis.File.prototype.text;
+    let calls = 0;
+    globalThis.File.prototype.text = function () {
+      calls += 1;
+      return calls === 1
+        ? new Promise((resolve) =>
+            globalThis.setTimeout(() => resolve(original.call(this)), 1200),
+          )
+        : original.call(this);
+    };
+  });
+  await openFile(files.cli); // read stalls for 1.2 s
+  await page.waitForTimeout(150);
+  await openFile(files.notJson); // chosen later, finishes first
+  await page.locator(".import-error").waitFor();
+  await page.waitForTimeout(1800); // the stalled read finishes now
+  assert.equal(
+    await page.locator(".report").count(),
+    0,
+    "a stale read must not open its report",
+  );
+  assert.match(
+    await page.locator(".import-error").innerText(),
+    /not valid JSON/,
+  );
+  await page.reload();
+  await page
+    .getByRole("heading", { level: 1, name: /Explore a report/ })
+    .waitFor();
+
+  // ---- Long unbroken strings wrap instead of widening the page ----
+  await openFile(files.longTokens);
+  await page
+    .getByRole("heading", { level: 1, name: /What we observed/ })
+    .waitFor();
+  for (const [w, h] of [
+    [1440, 1000],
+    [390, 844],
+    [320, 720],
+  ]) {
+    await page.setViewportSize({ width: w, height: h });
+    const overflow = await page.evaluate(() => ({
+      scroll: globalThis.document.documentElement.scrollWidth,
+      inner: globalThis.innerWidth,
+    }));
+    assert.ok(
+      overflow.scroll <= overflow.inner,
+      `long strings must not overflow at ${w}px: ${overflow.scroll} > ${overflow.inner}`,
+    );
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole("button", { name: /Close this report/ }).click();
+  await page
+    .getByRole("heading", { level: 1, name: /Explore a report/ })
+    .waitFor();
+
+  // ---- A report with the most requests the scanner can write stays usable ----
+  const loadStart = Date.now();
+  await openFile(files.heavy);
+  await page
+    .getByRole("heading", { level: 1, name: /What we observed/ })
+    .waitFor();
+  const loadMs = Date.now() - loadStart;
+  assert.ok(
+    loadMs < 15000,
+    `a large report must open promptly (took ${loadMs} ms)`,
+  );
+  assert.ok(
+    (await page.locator(".destination-list button").count()) <= 100,
+    "the timeline is bounded",
+  );
+  assert.match(await page.locator(".journey-panel").innerText(), /first 100/);
+  const closeStart = Date.now();
+  await page.getByRole("button", { name: /Close this report/ }).click();
+  await page
+    .getByRole("heading", { level: 1, name: /Explore a report/ })
+    .waitFor();
+  const closeMs = Date.now() - closeStart;
+  assert.ok(
+    closeMs < 5000,
+    `closing a large report must not freeze the page (took ${closeMs} ms)`,
+  );
+
   // Phone layout of the empty importer and of an error.
   for (const [w, h] of [
     [390, 844],
@@ -525,10 +662,7 @@ try {
     await page
       .getByRole("heading", { level: 1, name: /Explore a report/ })
       .waitFor();
-    await page.screenshot({
-      path: join(screenshotDir, "import-empty-desktop.png"),
-      fullPage: true,
-    });
+    await capture("import-empty-desktop.png", 1440, 1000);
   }
 
   const unexpectedExternal = requests.filter(

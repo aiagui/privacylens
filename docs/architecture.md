@@ -117,9 +117,14 @@ visitor's browser. The report format is specified in
 - The existing report components display it, labeled as imported. Every imported
   value is rendered as text, never as markup, a link, an image or a style.
 - The Content-Security-Policy limits images, fonts, connections, frames, media and
-  forms to the site itself, as a safety net behind that rule.
+  forms to the site itself, as a safety net behind that rule. It does **not**
+  restrict where scripts or styles load from (the framework needs inline ones), so
+  it would not stop a script injected by a future rendering bug; the rule that
+  imported values are only ever rendered as text is what protects against that, and
+  the rendering tests exist to keep it true.
 
-Limits. The importer checks format, not authenticity: a file can be edited, and a
+Limits. The timeline draws at most the first 100 requests of a large report (the
+inventory lists all of them). The importer checks format, not authenticity: a file can be edited, and a
 well-formed report can still be false. Validation caps sizes but cannot judge
 whether the evidence strings are accurate. Display relies on React's escaping; the
 rendering tests and the browser test exercise hostile values, but they are not a

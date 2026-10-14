@@ -8,6 +8,9 @@ import {
   classificationOf,
 } from "@/components/evidence";
 
+/** Most destinations the interactive timeline draws. */
+export const MAX_JOURNEY_REQUESTS = 100;
+
 function timing(request: RequestFinding) {
   return Number.isFinite(request.timeMs) && request.timeMs >= 0
     ? Math.round(request.timeMs)
@@ -15,14 +18,18 @@ function timing(request: RequestFinding) {
 }
 
 export function RequestJourney({
-  requests,
+  requests: allRequests,
   sample,
 }: {
   requests: RequestFinding[];
   sample: boolean;
 }) {
   const [selected, setSelected] = useState(0);
-  if (!requests.length) return null;
+  if (!allRequests.length) return null;
+  const total = allRequests.length;
+  // Drawing every request of a very large report would build a huge timeline;
+  // the full inventory below always lists all of them.
+  const requests = allRequests.slice(0, MAX_JOURNEY_REQUESTS);
   const current = requests[selected] ?? requests[0];
   const maxTime = Math.max(
     1,
@@ -36,8 +43,10 @@ export function RequestJourney({
           <p className="section-kicker">THE REQUEST WINDOW</p>
           <h2 id="journey-heading">The first moments.</h2>
           <p>
-            {requests.length} request signals from the initial page load. No
-            consent choice was made.
+            {total} request signals from the initial page load. No consent
+            choice was made.
+            {total > requests.length &&
+              ` The timeline shows the first ${requests.length}; the inventory below lists all of them.`}
           </p>
         </div>
         <span className="sample-tag">

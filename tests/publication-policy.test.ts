@@ -58,6 +58,9 @@ describe("publication policy", () => {
     for (const path of [
       "docs/assets/home-desktop.png",
       "docs/assets/home-mobile.png",
+      "docs/assets/import-empty-desktop.png",
+      "docs/assets/import-report-desktop.png",
+      "docs/assets/import-report-mobile.png",
       "docs/assets/report-desktop.png",
       "docs/assets/report-mobile.png",
       "public/icon.svg",

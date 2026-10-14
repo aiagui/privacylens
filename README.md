@@ -130,6 +130,8 @@ file is read inside your browser tab only: it is never uploaded, saved or sent
 anywhere, and closing the tab discards it. The format is documented in
 [report format](docs/report-format.md).
 
+![The website showing a report written by the scanner: evidence labels, the request timeline, outcomes and how the report was collected, from a synthetic local fixture.](docs/assets/import-report-desktop.png)
+
 ## Build it with us
 
 Help improve the explanations, test report accessibility, add reproducible

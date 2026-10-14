@@ -47,18 +47,23 @@ overrides.
 ### technology
 
 `name`, `category` (`analytics`, `advertising`, `tag-manager`, `session-replay`),
-`evidence` (list of strings), `observation` (`observed` or `inferred`) and an
+`evidence` (list of strings, at most 50 lines from the scanner, with a final "And N
+more similar requests are not listed." line when more were seen), `observation` (`observed` or `inferred`) and an
 optional `signature` (`id`, `version`) naming the rule that matched.
 
 ### cookie
 
 `name`, `domain`, `firstParty` (boolean), `secure`, `httpOnly`, optional `expires`
 (UTC time) and optional `sameSite` (`Strict`, `Lax` or `None`). A name that looks
-like an identifier or secret is written as `[REDACTED]`; that check is a heuristic.
+like an identifier or secret, or that contains a control or direction character, is
+written as `[REDACTED]`, and a cookie set without a name as `[unnamed]`. The
+identifier check is a heuristic, and the browser can return non-ASCII cookie names
+garbled, so such names may not read as the site wrote them.
 
 ### request
 
-`url` (origin), `domain` (host name), `timeMs` (milliseconds after navigation
+`url` (an http, https, ws or wss origin; WebSocket connections are recorded as
+ws or wss), `domain` (the host of `url`), `timeMs` (milliseconds after navigation
 started), `beforeConsent` (always `true`: reports cover the initial page load
 only), `resourceType` (lowercase, like `script` or `fetch`), and optionally
 `technology`, `classification` and `outcome`.
@@ -158,6 +163,8 @@ rules above. In addition it:
   requests, 2,000 cookies, 500 technologies);
 - requires `targetUrl`, `url` and the provenance origins to be bare http(s)
   origins, times to be real UTC dates, and counts to be bounded whole numbers;
+- requires a request's `domain` to be the host of its `url`, and a request that names a
+  technology not to be classified `unknown`;
 - builds a new object from validated fields only, never reusing the parsed file.
 
 ## How the website treats an imported file
@@ -167,5 +174,5 @@ It is not uploaded, stored (no cookies, local or session storage, IndexedDB or
 cache) or sent anywhere, and closing the report or the tab discards it. Every
 value is rendered as plain text; none becomes a link, image, style or script. The
 page's Content-Security-Policy additionally limits images, connections, frames and
-forms to the site itself as a safety net. An imported report is labeled as such,
+forms to the site itself as a safety net; it does not restrict scripts or styles. An imported report is labeled as such,
 because PrivacyLens can check its format but not its authenticity.

@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { hasUnsafeCharacter } from "../report/text.ts";
 import { isThirdParty } from "./detectors.ts";
 import type { CookieFinding, ScanReport } from "./types.ts";
 
@@ -9,10 +10,14 @@ import type { CookieFinding, ScanReport } from "./types.ts";
  * "user.john.smith") cannot be recognized and would be published.
  */
 export function sanitizeCookieName(name: string): string {
+  // Chromium reports a cookie set without a name ("Set-Cookie: value") as "".
+  if (name === "") return "[unnamed]";
   if (
     name.length > 128 ||
     name.includes("@") ||
-    [...name].some((character) => character.charCodeAt(0) < 32) ||
+    // The same characters the report format refuses, so a hostile name can
+    // never make a report unimportable.
+    hasUnsafeCharacter(name) ||
     /(?:bearer|token|secret|password|api[_-]?key)/i.test(name) ||
     // Names that embed an identifier rather than name a purpose: long hex or
     // base64-looking runs, JWT prefixes, or many digits.
@@ -44,8 +49,13 @@ export function toCookieFindings(
     name: sanitizeCookieName(cookie.name),
     domain: cookie.domain,
     firstParty: !isThirdParty(siteHostname, cookie.domain.replace(/^\./, "")),
+    // Clamped to year 9999: a later date has no four-digit ISO form.
     ...(cookie.expires > 0
-      ? { expires: new Date(cookie.expires * 1000).toISOString() }
+      ? {
+          expires: new Date(
+            Math.min(cookie.expires, 253_402_300_799) * 1000,
+          ).toISOString(),
+        }
       : {}),
     secure: cookie.secure,
     httpOnly: cookie.httpOnly,
