@@ -89,9 +89,8 @@ export function assessRequest(
 ): RequestAssessment {
   const signature = matchSignature(url);
   if (!signature) {
-    const vendor = signatures.find((candidate) =>
-      hostMatches(candidate, url.hostname.toLowerCase()),
-    );
+    const { host } = normalized(url);
+    const vendor = signatures.find((candidate) => hostMatches(candidate, host));
     return {
       classification: "unknown",
       reason: vendor
