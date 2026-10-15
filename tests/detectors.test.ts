@@ -98,6 +98,26 @@ describe("matching hardening from the security audit", () => {
     expect(assessRequest(url, "fetch").classification).toBe("observed");
   });
 
+  it("recognizes a trailing-dot vendor host even when its path is unknown", () => {
+    const ordinary = assessRequest(
+      new URL("https://www.facebook.com/trending"),
+      "document",
+    );
+    const trailingDot = assessRequest(
+      new URL("https://www.facebook.com./trending"),
+      "document",
+    );
+    expect(trailingDot).toEqual(ordinary);
+    expect(trailingDot.classification).toBe("unknown");
+    expect(trailingDot.reason).toContain("Meta Pixel host");
+    expect(
+      assessRequest(
+        new URL("https://facebook.com.example/trending"),
+        "document",
+      ).reason,
+    ).toContain("No known signature");
+  });
+
   it("matches the decoded path so percent-escapes cannot hide an endpoint", () => {
     const url = new URL("https://www.google-analytics.com/g/%63ollect?v=2");
     expect(assessRequest(url, "fetch").classification).toBe("observed");
